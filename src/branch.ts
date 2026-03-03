@@ -1,6 +1,6 @@
 // Schema for branch metadata
 
-import { z } from 'zod/mini';
+import * as v from 'valibot';
 
 export const HERITAGE = 'Heritage Branch';
 export const LIFE = 'Life Skills Branch';
@@ -10,19 +10,19 @@ export const VALUES = 'Values Branch';
 export const SPORTS = 'Sports & Fitness Branch';
 export const OUTDOOR = 'Outdoor Skills Branch';
 
-export const Branch = z.enum([HERITAGE, LIFE, SCIENCE, HOBBIES, VALUES, SPORTS, OUTDOOR]);
-export type Branch = z.infer<Branch>;
+export const Branch = v.enum([HERITAGE, LIFE, SCIENCE, HOBBIES, VALUES, SPORTS, OUTDOOR]);
+export type Branch = v.InferOutput<Branch>;
 
-export const BranchData = z.object({
-  needCoreSteps: z.number(),
-  needElectives: z.number(),
-  coreSteps: z.array(z.string()),
-  electives: z.array(z.string()),
+export const BranchData = v.object({
+  needCoreSteps: v.number(),
+  needElectives: v.number(),
+  coreSteps: v.array(v.string()),
+  electives: v.array(v.string()),
 });
 
 // Activities
-export const ActivityType = z.enum(['core', 'elective', 'htt', 'home']);
-export type ActivityType = z.infer<ActivityType>;
+export const ActivityType = v.enum(['core', 'elective', 'htt', 'home']);
+export type ActivityType = v.InferOutput<ActivityType>;
 
 // Activities are stored as a string, but we allow %y and %i
 // within the string, to indicate that the activity is repeated

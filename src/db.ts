@@ -1,15 +1,15 @@
 // Manages database in localStorage.
 
 import { Trailman } from './trailman';
-import { z } from 'zod/mini';
+import * as v from 'valibot';
 
 const TRAILMEN = '__sdh__trailmen';
-const trailmen = z.readonly(z.array(Trailman));
+const trailmen = v.pipe(v.array(Trailman), v.readonly());
 
 export function storeTrailmen(trailmen: Trailman[]): void {
   localStorage.setItem(TRAILMEN, JSON.stringify(trailmen));
 }
 
 export function loadTrailmen(): readonly Trailman[] {
-  return trailmen.parse(JSON.parse(localStorage.getItem(TRAILMEN) || '[]'));
+  return v.parse(trailmen, JSON.parse(localStorage.getItem(TRAILMEN) || '[]'));
 }

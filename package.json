@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "TamperMonkey userscripts for working with Trail Life Connect advancement and attendance",
   "scripts": {
+    "build": "mkdir -p dist; cat header.js <(npx esbuild --minify --bundle src/index.ts) > dist/tlc.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -19,6 +20,6 @@
     "@types/jquery": "^4.0.0",
     "esbuild": "^0.27.3",
     "typescript": "^5.9.3",
-    "zod": "^4.3.6"
+    "valibot": "^1.2.0"
   }
 }
