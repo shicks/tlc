@@ -1,0 +1,24 @@
+{
+  "name": "tlc",
+  "version": "1.0.0",
+  "description": "TamperMonkey userscripts for working with Trail Life Connect advancement and attendance",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shicks/tlc.git"
+  },
+  "author": "Stephen Hicks <stephenhicks@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shicks/tlc/issues"
+  },
+  "homepage": "https://github.com/shicks/tlc#readme",
+  "dependencies": {
+    "@types/jquery": "^4.0.0",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
+  }
+}
