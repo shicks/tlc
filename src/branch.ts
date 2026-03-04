@@ -10,8 +10,8 @@ export const VALUES = 'Values Branch';
 export const SPORTS = 'Sports & Fitness Branch';
 export const OUTDOOR = 'Outdoor Skills Branch';
 
-export const Branch = v.enum([HERITAGE, LIFE, SCIENCE, HOBBIES, VALUES, SPORTS, OUTDOOR]);
-export type Branch = v.InferOutput<Branch>;
+export const Branch = v.picklist([HERITAGE, LIFE, SCIENCE, HOBBIES, VALUES, SPORTS, OUTDOOR]);
+export type Branch = v.InferOutput<typeof Branch>;
 
 export const BranchData = v.object({
   needCoreSteps: v.number(),
@@ -21,8 +21,8 @@ export const BranchData = v.object({
 });
 
 // Activities
-export const ActivityType = v.enum(['core', 'elective', 'htt', 'home']);
-export type ActivityType = v.InferOutput<ActivityType>;
+export const ActivityType = v.picklist(['core', 'elective', 'htt', 'home']);
+export type ActivityType = v.InferOutput<typeof ActivityType>;
 
 // Activities are stored as a string, but we allow %y and %i
 // within the string, to indicate that the activity is repeated

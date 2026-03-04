@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 
-export const Patrol = v.enum(['Fox', 'Hawk', 'Mountain Lion']);
+export const Patrol = v.picklist(['Fox', 'Hawk', 'Mountain Lion']);
 export type Patrol = v.InferOutput<typeof Patrol>;
 
 export const Trailman = v.pipe(v.object({
@@ -10,4 +10,4 @@ export const Trailman = v.pipe(v.object({
   patrol: Patrol,
   year: v.number(),
 }), v.readonly());
-export type Trailman = v.InferOutput<Trailman>;
+export type Trailman = v.InferOutput<typeof Trailman>;

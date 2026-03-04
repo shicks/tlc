@@ -6,7 +6,7 @@ export function downloadData(
   filename: string,
   type: string = 'text/csv',
 ): void {
-  const blob = new Blob([data], { type: type });
+  const blob = new Blob([data as Uint8Array<ArrayBuffer>], { type: type });
   const url = URL.createObjectURL(blob);
 
   const link = document.createElement('a');
@@ -37,7 +37,8 @@ export function sleep(secs: number): Promise<void> {
   return new Promise<void>(resolve => setTimeout(resolve, secs * 1000));
 }
 
-export function sdhWaitFor<T>(pred: () => T|false|undefined|null): Promise<T> {
+type OrFalsy<T> = T | false | undefined | null;
+export function waitFor<T>(pred: () => OrFalsy<T>): Promise<T> {
   return new Promise<T>(resolve => {
     function check() {
       const result = pred();
@@ -48,3 +49,10 @@ export function sdhWaitFor<T>(pred: () => T|false|undefined|null): Promise<T> {
   });
 }
 
+export function exists<T>(arg: T|undefined|null): arg is T {
+  return arg != null;
+}
+export function assertType<T>(_arg: unknown): asserts _arg is T {}
+export function assert(arg: unknown): asserts arg {
+  if (!arg) throw new Error(`Assertion failed`);
+}

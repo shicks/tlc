@@ -2,9 +2,11 @@
   "name": "tlc",
   "version": "1.0.0",
   "description": "TamperMonkey userscripts for working with Trail Life Connect advancement and attendance",
+  "type": "module",
   "scripts": {
-    "build": "mkdir -p dist; cat header.js <(npx esbuild --minify --bundle src/index.ts) > dist/tlc.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "mkdir -p dist; cat header.js <(npx esbuild --tree-shaking --bundle src/index.ts) > dist/tlc.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "nodemon --watch src --ext ts --exec \"npx tsc && npm run build\""
   },
   "repository": {
     "type": "git",
@@ -21,5 +23,8 @@
     "esbuild": "^0.27.3",
     "typescript": "^5.9.3",
     "valibot": "^1.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }

@@ -1,6 +1,46 @@
 // Tools for dealing with advancement UI.
 
-import { waitFor } from './util';
+import { loadTrailmen } from './db';
+import { Trailman } from './trailman';
+import { assertType, exists, july15, waitFor } from './util';
+import * as ui from './ui';
+
+export function auditTrailmen(): string {
+  const errors = [];
+  const byId = new Map(loadTrailmen().map(t => [t.id, t]));
+  for (const o of $('#trailmen-select option')) {
+    assertType<HTMLOptionElement>(o);
+    const found = byId.get(o.value);
+    if (!found) {
+      errors.push(`Missing from member list: ${o.textContent}`);
+    } else if (o.textContent !== `${found.lastName}, ${found.firstName}`) {
+      errors.push(`Name mismatch: "${found.lastName}, ${found.firstName}" vs "${o.textContent}"`);
+    }
+  }
+  return errors.join('\n');
+}
+
+function checkGridView() {
+  if (![...document.querySelectorAll('.btn-primary.active')]
+         .map(b => b.textContent.trim())
+         .includes('Grid View')) {
+    throw new Error(`Not in Grid View`);
+  }
+}
+function checkWoodlands() {
+  if (![...document.querySelectorAll('.btn-primary.active')]
+         .map(b => b.textContent.trim())
+         .includes('Woodlands Trail')) {
+    throw new Error(`Woodlands Trail not selected`);
+  }
+}
+function checkCurrentLevel() {
+  if (![...document.querySelectorAll('.btn-primary.active')]
+         .map(b => b.textContent.trim())
+         .includes('Trailman\'s Current Level')) {
+    throw new Error(`Not in Grid View`);
+  }
+}
 
 /**
  * Selects the given trailmen on the advancement page.  Returns the number of
@@ -10,18 +50,36 @@ export function selectTrailmen(names: string[]): number {
   // TODO - verify preconditions, better error handling
   //   - but we do need to handle missing names somewhat gracefully...
   //     maybe keep track though? log?
+  checkGridView();
+  checkWoodlands();
+  checkCurrentLevel();
+
   const opts =
     new Map([...$('#trailmen-select option')]
-              .map(o => [o.textContent, o.value]));
-  const ids = names.map(n => opts.get(n)).filter(x => x);
+              .filter(o => !o.textContent.includes('|'))
+              .map(o => [o.textContent, (o as HTMLOptionElement).value]));
+  const ids = names.map(n => opts.get(n)).filter(exists);
   $('#trailmen-select').val(ids).trigger('change');
+
+  // Do some extra error reporting
+  const missing = names.filter(n => !opts.has(n));
+  const optsTranspose = new Map([...opts].map(([a, b]) => [b, a]));
+  const allTrailmenById = new Map(loadTrailmen().map(t => [t.id, t]));
+  const unknown =
+    [...opts.values()]
+      .filter(id => !allTrailmenById.has(id))
+      .map(id => optsTranspose.get(id)!);
+  const messages = [];
+  if (missing.length) messages.push(`Missing trailmen from select:\n  ${missing.join('\n  ')}`);
+  if (unknown.length) messages.push(`Unknown trailmen, please rescrape:\n  ${unknown.join('\n  ')}`);
+  if (messages.length) ui.Dialog.textarea(messages.join('\n\n'));
   return ids.length;
 };
 
 /** Selects the given branch.  Returns true if successful. */
-export function selectBranch = function(branch: string): boolean {
+export function selectBranch(branch: string): boolean {
   const id = [...$('#badge-select option')].flatMap(o =>
-    o.textContent.includes(branch) ? [o.value] : [])[0];
+    o.textContent.includes(branch) ? [(o as HTMLOptionElement).value] : [])[0];
   if (!id) {
     console.error(`Could not find branch: ${branch}`);
     return false;
@@ -51,3 +109,135 @@ export async function switchBranch(branch: string): Promise<boolean> {
       .some(e => e.textContent.includes(branch)));
   return true;
 }
+
+function filterTrailmen(pred: (t: Trailman) => boolean): string[] {
+  auditTrailmen();
+  const names = [];
+  for (const t of loadTrailmen()) {
+    if (pred(t)) names.push(`${t.lastName}, ${t.firstName}`);
+  }
+  return names;
+}
+
+function pickRow(): Promise<HTMLElement> {
+  return ui.pickElement('#award_html tr.row-highlight', 'filterable row');
+}
+
+async function uncheckAll() {
+  const row = await pickRow();
+  const label = row.firstElementChild!.firstChild!;
+  // TODO - show all the names, dates, and comments?
+  await ui.Dialog.confirm(`Uncheck all "${label.textContent}"?`);
+  for (const i of row.querySelectorAll('.advance-icon[data-value="1"] i')) {
+    (i as HTMLElement).click();
+  }
+}
+
+async function checkAll() {
+  const row = await pickRow();
+  const label = row.firstElementChild!.firstChild!;
+  // TODO - show all the names, dates, and comments?
+  await ui.Dialog.confirm(`Check all "${label.textContent}"?`);
+  for (const i of row.querySelectorAll('.advance-icon[data-value="0"] i')) {
+    (i as HTMLElement).click();
+  }
+}
+
+async function pickEventDetails() {
+    const event = await ui.pickElement('td:has(.advance-icon[data-value="1"])', 'valid event');
+    setDetailsFromEvent(event);
+}
+function setDetailsFromEvent(event: HTMLElement) {
+    const [, comment] = event.querySelector('i')!.dataset['originalTitle']!.split('<br>');
+    const date = event.querySelector('.completed_on_date')!.textContent;
+    $('input#date-specified').val(date);
+    $('textarea#comment-specified').val(comment || '');
+}
+
+function splitDates() {
+    // Highlight all check marks based on whether they're before or after Aug 1
+  for (const event of document.querySelectorAll('td:has(.advance-icon[data-value="1"])')) {
+    const date = new Date((event as HTMLElement).querySelector('.completed_on_date')!.textContent).getTime();
+    (event as HTMLElement).style.setProperty(
+      'background-color',
+      date < july15.getTime() ? '#faa' : '#afa',
+      'important',
+    );
+  }
+  for (const event of document.querySelectorAll('td:has(.advance-icon[data-value="0"])')) {
+    Object.assign(
+      (event as HTMLElement).style,
+      {backgroundColor: undefined},
+    );
+  }
+}
+
+// Returns a new list of trailmen
+async function filterByRow() {
+    const row = await pickRow();
+    const isAttendance = row?.firstChild?.textContent === 'Attended Event';
+    const query = isAttendance ? 'i.fa-check' : '.advance-icon[data-value="1"]';
+    const checked = [...row.querySelectorAll(query)].flatMap((el) => {
+        const id = el.id.split(isAttendance ? /-/g : /_/g)[1];
+        const header = document.querySelector(`tbody#table_header th[data-user-id="${id}"]`);
+        if (!header) return [];
+        return [header.textContent.trim()];
+    });
+    return selectTrailmen(checked);
+};
+
+// async function removeOneTrailman() {
+//     const headers = [...document.querySelectorAll('tbody#table_header th[data-user-id]')];
+//     const names = headers.map(h => h.textContent.trim());
+//     const header = await pickElement('th[data-user-id]', 'removable column');
+//     return names.filter(n => n !== ancestor.textContent.trim());
+// };
+
+function installUi() {
+  // Listen for top-level ctrl-click events, for "pick" action.
+  document.body.addEventListener(
+    'click',
+    (e) => {
+      if (!e.ctrlKey) return;
+      const event = (e.target as HTMLElement)?.closest('td:has(.advance-icon[data-value="1"])');
+      if (event) setDetailsFromEvent(event as HTMLElement);
+    },
+    {capture: true},
+  );
+  // Add buttons
+  function selectByFilter(pred: (t: Trailman) => boolean): void {
+    // NOTE: audit happens in filter
+    selectTrailmen(filterTrailmen(pred));
+  }
+  ui.addButtonsAfter(/^Select Trailmen:/, {
+    'Fox 1'() { selectByFilter((t: Trailman) => t.patrol === 'Fox' && t.year === 1); },
+    'Fox 2'() { selectByFilter((t: Trailman) => t.patrol === 'Fox' && t.year === 2); },
+    'Hawk 1'() { selectByFilter((t: Trailman) => t.patrol === 'Hawk' && t.year === 1); },
+    'Hawk 2'() { selectByFilter((t: Trailman) => t.patrol === 'Hawk' && t.year === 2); },
+    'ML 1'() { selectByFilter((t: Trailman) => t.patrol === 'Mountain Lion' && t.year === 1); },
+    'ML 2'() { selectByFilter((t: Trailman) => t.patrol === 'Mountain Lion' && t.year === 2); },
+    'Year 1'() { selectByFilter((t: Trailman) => t.year === 1); },
+    'Year 2'() { selectByFilter((t: Trailman) => t.year === 2); },
+    'All'() { selectByFilter(() => true); },
+    // ['Filter', filter],
+    // ['Remove', removeOne],
+  });
+  ui.addButtonsToTop({
+    Filter: filterByRow,
+    Pick: pickEventDetails,
+    Split: splitDates,
+  });
+
+  // Add a button to uncheck all.
+  ui.addButtonsAfter('Lock current completed', {'Uncheck all': uncheckAll});
+  ui.addButtonsAfter('Show dates', {'Check all': checkAll});
+  // ui.addButtonsAfter('Track date:', {
+  //   Pick: pickEventDetails,
+  //   // Split: splitDates,
+  //   // Export: exportBranch,
+  // });
+
+}
+
+const URL_PREFIX = 'https://www.traillifeconnect.com/advancement';
+if (window.location.href.startsWith(URL_PREFIX)) installUi();
