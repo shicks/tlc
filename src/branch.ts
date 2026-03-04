@@ -19,6 +19,7 @@ export const BranchData = v.object({
   coreSteps: v.array(v.string()),
   electives: v.array(v.string()),
 });
+export type BranchData = v.InferOutput<typeof BranchData>;
 
 // Activities
 export const ActivityType = v.picklist(['core', 'elective', 'htt', 'home']);
@@ -38,3 +39,17 @@ export type ActivityType = v.InferOutput<typeof ActivityType>;
 //   type: ActivityType,
 //   id: z.string(),
 // });
+
+export const ConcreteActivity = v.object({
+  name: v.string(), // NOTE: may include "1 of 2" or "Year 1"
+  type: ActivityType,
+  date: v.number(), // epoch millis
+  // year: v.optional(v.number()),
+  // index: v.optional(v.number()),
+});
+export type ConcreteActivity = v.InferOutput<typeof ConcreteActivity>;
+
+/** Scrapes the current advancement page to find metadata about a branch. */
+export function scrapeBranch(): BranchData {
+  
+}
