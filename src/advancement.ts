@@ -46,7 +46,7 @@ function checkCurrentLevel() {
  * Selects the given trailmen on the advancement page.  Returns the number of
  * selected trailmen.
  */
-export function selectTrailmen(names: string[]): number {
+export function selectTrailmen(names: string[], quiet = false): number {
   // TODO - verify preconditions, better error handling
   //   - but we do need to handle missing names somewhat gracefully...
   //     maybe keep track though? log?
@@ -72,7 +72,7 @@ export function selectTrailmen(names: string[]): number {
   const messages = [];
   if (missing.length) messages.push(`Missing trailmen from select:\n  ${missing.join('\n  ')}`);
   if (unknown.length) messages.push(`Unknown trailmen, please rescrape:\n  ${unknown.join('\n  ')}`);
-  if (messages.length) ui.Dialog.textarea(messages.join('\n\n'));
+  if (!quiet && messages.length) ui.Dialog.textarea(messages.join('\n\n'));
   return ids.length;
 };
 
@@ -88,14 +88,23 @@ export function selectBranch(branch: string): boolean {
   return true;
 };
 
-/** Selects trailmen and waits for the page to redraw. */
-export async function switchTrailman(name: string): Promise<boolean> {
-  selectTrailmen([]);
-  await waitFor(() => [...$('#award_html input')].length === 0);
-  if (!selectTrailmen([name])) return false;
-  await waitFor(() => [...$('#award_html input')].length > 0);
-  return true;
-}
+// NOTE: THIS IS FOR STANDARD VIEW
+// /** Selects trailmen and waits for the page to redraw. */
+// export async function switchTrailman(name: string): Promise<boolean> {
+//   selectTrailmen([]);
+//   await waitFor(() => [...$('#award_html input')].length === 0);
+//   if (!selectTrailmen([name])) return false;
+//   await waitFor(() => [...$('#award_html input')].length > 0);
+//   return true;
+// }
+
+// export async function switchTrailmen(names: string[]): Promise<boolean> {
+//   selectTrailmen([]);
+//   await waitFor(() => [...$('#award_html input')].length === 0);
+//   if (!selectTrailmen(names)) return false;
+//   await waitFor(() => [...$('#award_html input')].length > 0);
+//   return true;
+// }
 
 /** Selects branch and waits for the page to redraw. */
 export async function switchBranch(branch: string): Promise<boolean> {

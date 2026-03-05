@@ -129,11 +129,13 @@ function makeButton(
   const btn = document.createElement('button');
   btn.textContent = label;
   btn.addEventListener('click', (e) => {
-    try {
-      action();
-    } catch (err: unknown) {
-      Dialog.textarea(`FAILURE\n${(err as Error)?.stack || err}`);
-    }
+    (async () => {
+      try {
+        await action();
+      } catch (err: unknown) {
+        Dialog.textarea(`FAILURE\n${(err as Error)?.stack || err}`);
+      }
+    })();
     e.preventDefault();
     e.stopPropagation();
     return false;
