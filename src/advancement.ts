@@ -1,16 +1,14 @@
 // Tools for dealing with advancement UI.
 
-import { loadTrailmen } from './db';
-import { Trailman } from './trailman';
+import { getTrailmanById, getTrailmen, Trailman } from './trailman';
 import { assertType, exists, july15, waitFor } from './util';
 import * as ui from './ui';
 
 export function auditTrailmen(): string {
   const errors = [];
-  const byId = new Map(loadTrailmen().map(t => [t.id, t]));
   for (const o of $('#trailmen-select option')) {
     assertType<HTMLOptionElement>(o);
-    const found = byId.get(o.value);
+    const found = getTrailmanById(o.value);
     if (!found) {
       errors.push(`Missing from member list: ${o.textContent}`);
     } else if (o.textContent !== `${found.lastName}, ${found.firstName}`) {
@@ -64,10 +62,9 @@ export function selectTrailmen(names: string[], quiet = false): number {
   // Do some extra error reporting
   const missing = names.filter(n => !opts.has(n));
   const optsTranspose = new Map([...opts].map(([a, b]) => [b, a]));
-  const allTrailmenById = new Map(loadTrailmen().map(t => [t.id, t]));
   const unknown =
     [...opts.values()]
-      .filter(id => !allTrailmenById.has(id))
+      .filter(id => !getTrailmanById(id))
       .map(id => optsTranspose.get(id)!);
   const messages = [];
   if (missing.length) messages.push(`Missing trailmen from select:\n  ${missing.join('\n  ')}`);
@@ -122,7 +119,7 @@ export async function switchBranch(branch: string): Promise<boolean> {
 function filterTrailmen(pred: (t: Trailman) => boolean): string[] {
   auditTrailmen();
   const names = [];
-  for (const t of loadTrailmen()) {
+  for (const t of getTrailmen()) {
     if (pred(t)) names.push(`${t.lastName}, ${t.firstName}`);
   }
   return names;

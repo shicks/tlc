@@ -2,8 +2,7 @@
 // Specifically, we may want to restrict to exactly this URL:
 //   https://www.traillifeconnect.com/user/index?UserSearch%5Btrailman%5D=1&UserSearch%5Blevel_id%5D=wt&_tog5317d374=all
 
-import { storeTrailmen, loadTrailmen } from './db';
-import { Patrol, Trailman } from './trailman';
+import { getSubpatrols, getTrailmen, getTrailmenBySubpatrol, Patrol, storeTrailmen, Trailman } from './trailman';
 import { assert, assertType, july15 } from './util';
 import * as ui from './ui';
 import * as v from 'valibot';
@@ -15,8 +14,8 @@ const somePatrol = /Fox|Hawk|Mountain Lion/;
  * Appends/updates any entries (by id) in the database.
  */
 export function scrapeTrailmen(): number {
-  // Start with the existing database.
-  const trailmen = new Map<string, Trailman>(loadTrailmen().map(t => [t.id, t]));
+  // Start with the existing database (NOTE: we're purposely not using getById)
+  const trailmen = new Map<string, Trailman>(getTrailmen().map(t => [t.id, t]));
   let updateCount = 0;
 
   // Inspect the header rather than hardcoding the column indices
@@ -44,12 +43,12 @@ export function scrapeTrailmen(): number {
     const [lastName, firstName, ...rest] = name.split(', ');
     if (rest.length) throw new Error(`Bad name: ${name}`);
     const patrol = v.parse(Patrol, tr.children[levelColumn]!.textContent.trim());
-    const subpatrol = tr.children[patrolColumn]!.textContent;
+    const subpatrolField = tr.children[patrolColumn]!.textContent;
     let year;
-    if (/[12]/.test(subpatrol) && !/1.*2|2.*1/.test(subpatrol)) {
-      year = subpatrol.includes('1') ? 1 : 2;
-      if (somePatrol.test(subpatrol) && !subpatrol.includes(patrol)) {
-        throw new Error(`Mismatched subpatrol ${subpatrol} for level ${patrol}`);
+    if (/[12]/.test(subpatrolField) && !/1.*2|2.*1/.test(subpatrolField)) {
+      year = subpatrolField.includes('1') ? 1 : 2;
+      if (somePatrol.test(subpatrolField) && !subpatrolField.includes(patrol)) {
+        throw new Error(`Mismatched subpatrol ${subpatrolField} for level ${patrol}`);
       }
     } else {
       const bdayStr = tr.children[bdayColumn]!.textContent.trim();
@@ -63,7 +62,8 @@ export function scrapeTrailmen(): number {
       if (patrol !== patrolCheck) throw new Error(`Wrong patrol for ${name}: expected ${patrolCheck} but got ${patrol}`);
     }
     assert(lastName && firstName && id && patrol && year);
-    const trailman = {lastName, firstName, id, patrol, year};
+    const subpatrol = `${patrol} ${year}`; // clean it up
+    const trailman = {lastName, firstName, name, id, patrol, year, subpatrol};
     const prev = trailmen.get(id);
     if (!prev || objDiffers(prev, trailman)) {
       trailmen.set(id, trailman);
@@ -98,13 +98,11 @@ function formatAllTrailmen(): string {
       return fa < fb ? -1 : fa > fb ? 1 : 0;
     }
   }
-  const patrols = Map.groupBy(loadTrailmen(), ({patrol, year}) => `${patrol} ${year}`);
-  
-  return [...patrols.keys()]
+  return getSubpatrols()
     .sort()
     .map((patrol) => {
       const trailmen =
-        patrols.get(patrol)!
+        [...getTrailmenBySubpatrol(patrol)!]
           .sort(by(name))
           .map(t => `${name(t)} (${t.id})`)
           .join('\n  ');

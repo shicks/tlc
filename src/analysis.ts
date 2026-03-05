@@ -1,7 +1,6 @@
 // Analysis of advancement grid to figure out what everybody needs.
 
-import { loadTrailmen } from './db';
-import { Trailman, TrailmanId } from './trailman';
+import { getSubpatrols, getTrailmanById, getTrailmen, getTrailmenBySubpatrol, Trailman, TrailmanId } from './trailman';
 import {
   BRANCHES,
   Branch,
@@ -173,9 +172,8 @@ export function checkBranchProgress(
 
 export function scrapeProgress(
   branchData: BranchData,
-  trailmen: Map<TrailmanId, Trailman>,
 ): Map<Trailman, ConcreteActivity[]> {
-  const map = new Map([...trailmen.values()].map(t => [t, []]));
+  const map = new Map(getTrailmen().map(t => [t, []]));
   for (const e of document.querySelectorAll('.advance-icon[data-value="1"]')) {
     assertType<HTMLElement>(e);
     const [activityId, trailmanId, levelId] = e.id.split(/_/g);
@@ -183,7 +181,7 @@ export function scrapeProgress(
     const activity = branchData.activities.get(activityId!);
     if (!activity) throw new Error(`Unknown activity: ${activityId}`);
     const {name, type} = activity;
-    const trailman = trailmen.get(trailmanId!);
+    const trailman = getTrailmanById(trailmanId!);
     if (!trailman) throw new Error(`Unknown trailman: ${trailmanId}`);
     const note = (e.firstChild as HTMLElement).dataset.originalTitle
       ?.replace(/^.*?<br>/, '') || '';
@@ -199,21 +197,19 @@ export function scrapeProgress(
 }
 
 export async function analyze() {
-  const trailmen = new Map<TrailmanId, Trailman>(loadTrailmen().map(t => [t.id, t]));
-
   // Compute Forest Award status
   const badge = new Map<TrailmanId, string>();
   for (const patrol of ['Fox', 'Hawk', 'Mountain Lion']) {
     await switchBranch(`${patrol} Branch Patch (Joining Award)` as Branch);
     for (const e of $('#table_items > tr.row-highlight + tr:not(.row-highlight) > td > div')) {
       const trailmanId = e.id.split(/_/g)[0]!;
-      if (trailmen.get(trailmanId)?.patrol !== patrol) continue;
+      if (getTrailmanById(trailmanId)?.patrol !== patrol) continue;
       if (e.textContent.startsWith('100%')) badge.set(trailmanId, 'joining');
     }
     await switchBranch(`${patrol} Forest Award` as Branch);
     for (const e of $('.advance-icon[data-value="1"]')) {
       const trailmanId = e.id.split(/_/g)[1]!;
-      if (trailmen.get(trailmanId)?.patrol !== patrol) continue;
+      if (getTrailmanById(trailmanId)?.patrol !== patrol) continue;
       const dateElem = e.nextElementSibling;
       if (!dateElem?.classList.contains('completed_on_date')) {
         throw new Error(`Could not find completion date for activity`);
@@ -229,12 +225,12 @@ export async function analyze() {
 
   // Iterate over the branches
   const reports = new Map<TrailmanId, Map<Branch, StructuredProgress>>(
-    [...trailmen.keys()].map(t => [t, new Map()]),
+    getTrailmen().map(t => [t.id, new Map()]),
   );
   for (const branch of BRANCHES) {
     await switchBranch(branch);
     const branchData = scrapeBranch();
-    for (const [t, activities] of scrapeProgress(branchData, trailmen)) {
+    for (const [t, activities] of scrapeProgress(branchData)) {
       reports.get(t.id)!
         .set(branch, checkBranchProgress(branchData, upcoming[branch], activities, t.year));
     }
@@ -249,9 +245,8 @@ export async function analyze() {
     ...BRANCHES,
     'Extra HTT',
   ]];
-  const byPatrol = Map.groupBy(trailmen.values(), t => `${t.patrol} ${t.year}`);
-  for (const patrol of [...byPatrol.keys()].sort()) {
-    for (const trailman of byPatrol.get(patrol)!) {
+  for (const patrol of getSubpatrols()) {
+    for (const trailman of getTrailmenBySubpatrol(patrol)!) {
       const row = [
         `${trailman.lastName}, ${trailman.firstName}`,
         patrol.replace('Mountain Lion', 'ML'),
