@@ -56,3 +56,9 @@ export function assertType<T>(_arg: unknown): asserts _arg is T {}
 export function assert(arg: unknown): asserts arg {
   if (!arg) throw new Error(`Assertion failed`);
 }
+
+export function queryAll(query: string): HTMLElement[];
+export function queryAll<E extends Element = HTMLElement>(query: string, ctor: {new(): E, prototype: E}): E[];
+export function queryAll(query: string, ctor = HTMLElement): Element[] {
+  return [...document.querySelectorAll(query)].filter(e => e instanceof ctor);
+}

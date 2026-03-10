@@ -222,6 +222,46 @@ export function pickElement(query: string, name = 'valid element'): Promise<HTML
   });
 }
 
+interface ExtraAttrs {
+  parent: Element;
+  style: string;
+}
+type DomAttrs<E> = {
+  [K in keyof E|keyof ExtraAttrs]?:
+  K extends keyof ExtraAttrs ? ExtraAttrs[K] :
+    K extends keyof E ? E[K] : never
+};
+type DomArg<K extends keyof HTMLElementTagNameMap> =
+    string|Node|DomAttrs<HTMLElementTagNameMap[K]>;
+export function dom<K extends keyof HTMLElementTagNameMap>(
+  tag: K,
+  ...rest: DomArg<K>[]
+): HTMLElementTagNameMap[K];
+export function dom<K extends 'text'>(tag: K, value: string): Text;
+export function dom(tag: string, ...rest: any[]): Node {
+  const e = tag === 'text' ?
+    document.createTextNode(rest[0] as string) :
+    document.createElement(tag);
+  for (const attr of rest) {
+    if (attr instanceof Node) {
+      e.appendChild(attr);
+    } else if (typeof attr === 'string') {
+      e.appendChild(document.createTextNode(attr));
+    } else if (typeof attr === 'object') {
+      for (const [key, val] of Object.entries(attr)) {
+        if (key === 'parent') {
+          (val as HTMLElement).appendChild(e);
+        } else if (key.startsWith('on')) {
+          e.addEventListener(key.substring(2), val as any);
+        } else {
+          (e as any)[key] = val;
+        }
+      }
+    }
+  }
+  return e;
+}
+
 // Basic idea here: pickElement sets up an overlay to "intercept" all click events, with an
 // [X] button and ESC handler to cancel?  But this is a bit more complicated than a simple
 // {once: true} setting.

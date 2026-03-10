@@ -4,7 +4,7 @@
   "description": "TamperMonkey userscripts for working with Trail Life Connect advancement and attendance",
   "type": "module",
   "scripts": {
-    "build": "mkdir -p dist; cat header.js <(npx esbuild --tree-shaking --bundle src/index.ts) > dist/tlc.js",
+    "build": "bash -c 'mkdir -p dist; cat header.js <(npx esbuild --tree-shaking --bundle src/index.ts) > dist/tlc.js'",
     "test": "echo \"Error: no test specified\" && exit 1",
     "watch": "nodemon --watch src --ext ts --exec \"npx tsc && npm run build\""
   },
@@ -20,7 +20,10 @@
   "homepage": "https://github.com/shicks/tlc#readme",
   "dependencies": {
     "@types/jquery": "^4.0.0",
+    "@types/papaparse": "^5.5.2",
     "esbuild": "^0.27.3",
+    "fuzzball": "^2.2.3",
+    "papaparse": "^5.5.3",
     "typescript": "^5.9.3",
     "valibot": "^1.2.0"
   },
