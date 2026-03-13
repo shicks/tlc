@@ -16,10 +16,11 @@ import {
   scrapeBranch,
 } from './branch';
 import { switchBranch } from './advancement';
-import { assertType, july15 } from './util';
+import { assertType, isLastYear, isThisYear, parseDate, today } from './util';
 import { Dialog, addButtonsToTop } from './ui';
 
 const upcoming = {
+  // TODO - convert to a calendar, only add if after today
   [HERITAGE]: [],
   [LIFE]: [],
   [SCIENCE]: ['Rocketry'],
@@ -148,7 +149,7 @@ class CompletedActivities {
   private addHome(activity: ConcreteActivity) {
     if (this.home < 2 * this.year) {
       this.home++;
-      if (activity.date > july15.getTime()) this.homeFree = false;
+      if (isThisYear(activity.date)) this.homeFree = false;
     }
   }
 }
@@ -171,7 +172,7 @@ export function checkBranchProgress(
   const upcomingActivities: ConcreteActivity[] = upcoming.map(name => {
     const type = name === 'HTT' ? 'htt' : activitiesByName.get(name.replace('%y', 'Year 1'))?.type;
     if (!type) throw new Error(`Unknown upcoming activity: ${name}`);
-    return {name, type, note: '', date: Date.now()};
+    return {name, type, note: '', date: today};
   });
   let goal: 'branch'|'star' = year === 1 ? 'branch' : 'star';
 
@@ -196,8 +197,7 @@ export function checkBranchProgress(
     goal = 'branch';
     // If we're not at all on track for a star AND we didn't earn
     // the branch already last year, see if we can dial it back.
-    const lastYear = july15.getTime();
-    const completedLastYear = completed.filter(a => a.date < lastYear);
+    const completedLastYear = completed.filter(a => isLastYear(a.date));
     const old = new CompletedActivities(1, completedLastYear).check(goal, branchData);
     if (!old.complete) check = allActivities.check(goal, branchData);
   }
@@ -227,7 +227,7 @@ export function scrapeProgress(
     if (!dateElem?.classList.contains('completed_on_date')) {
       throw new Error(`Could not find completion date for activity`);
     }
-    const date = new Date(dateElem.textContent).getTime();
+    const date = parseDate(dateElem.textContent);
     const completed: ConcreteActivity[] = map.get(trailman)!;
     completed.push({name, type, date, note});
   }
@@ -252,8 +252,8 @@ export async function analyze() {
       if (!dateElem?.classList.contains('completed_on_date')) {
         throw new Error(`Could not find completion date for activity`);
       }
-      const date = new Date(dateElem.textContent);
-      if (date.getTime() < july15.getTime()) {
+      const date = parseDate(dateElem.textContent);
+      if (isLastYear(date)) {
         badge.set(trailmanId, 'forest');
       } else {
         badge.set(trailmanId, 'forest (this year)');

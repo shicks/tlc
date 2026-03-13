@@ -3,7 +3,7 @@
 //   https://www.traillifeconnect.com/user/index?UserSearch%5Btrailman%5D=1&UserSearch%5Blevel_id%5D=wt&_tog5317d374=all
 
 import { getSubpatrols, getTrailmen, getTrailmenBySubpatrol, Patrol, storeTrailmen, Trailman } from './trailman';
-import { assert, assertType, july15 } from './util';
+import { assert, assertType, july15, parseDate } from './util';
 import * as ui from './ui';
 import * as v from 'valibot';
 
@@ -51,14 +51,11 @@ export function scrapeTrailmen(): number {
         throw new Error(`Mismatched subpatrol ${subpatrolField} for level ${patrol}`);
       }
     } else {
-      const bdayStr = tr.children[bdayColumn]!.textContent.trim();
-      const bdayMatch = /^(\d\d?)\/(\d\d?)\/(\d\d\d\d)$/.exec(bdayStr);
-      if (!bdayMatch) throw new Error(`Bad birthday for ${name}: ${bdayStr}`);
-      let [, bdayMonth,, bdayYear] = [...bdayMatch].map(Number);
-      if (bdayMonth! > 10) bdayYear!++;
-      const ageOnOct31 = july15.getFullYear() - bdayYear!;
-      year = (ageOnOct31 - 1) % 2 + 1;
-      const patrolCheck = ['Fox', 'Hawk', 'Mountain Lion'][((ageOnOct31 - year) - 4) >> 1];
+      const bday = parseDate(tr.children[bdayColumn]!.textContent.trim());
+      const oct31 = july15.with({month: 10, day: 31});
+      const age = bday.until(oct31, {smallestUnit: 'years', roundingMode: 'floor'}).years;
+      year = (age - 1) % 2 + 1;
+      const patrolCheck = ['Fox', 'Hawk', 'Mountain Lion'][((age - year) - 4) >> 1];
       if (patrol !== patrolCheck) throw new Error(`Wrong patrol for ${name}: expected ${patrolCheck} but got ${patrol}`);
     }
     assert(lastName && firstName && id && patrol && year);

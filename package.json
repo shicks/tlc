@@ -4,9 +4,9 @@
   "description": "TamperMonkey userscripts for working with Trail Life Connect advancement and attendance",
   "type": "module",
   "scripts": {
-    "build": "bash -c 'mkdir -p dist; cat header.js <(npx esbuild --tree-shaking --bundle src/index.ts) > dist/tlc.js'",
+    "build": "bash -c 'mkdir -p dist; cat <(sed s/DATE/$(date +%Y%m%d)/ header.js) <(npx esbuild --tree-shaking --bundle src/index.ts) > dist/tlc.js'",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "nodemon --watch src --ext ts --exec \"npx tsc && npm run build\""
+    "watch": "nodemon --watch src --ext ts --exec \"npx tsgo && npm run build\""
   },
   "repository": {
     "type": "git",
@@ -21,10 +21,11 @@
   "dependencies": {
     "@types/jquery": "^4.0.0",
     "@types/papaparse": "^5.5.2",
+    "@typescript/native-preview": "^7.0.0-dev.20260313.1",
     "esbuild": "^0.27.3",
     "fuzzball": "^2.2.3",
     "papaparse": "^5.5.3",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.1-rc",
     "valibot": "^1.2.0"
   },
   "devDependencies": {

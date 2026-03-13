@@ -1,7 +1,7 @@
 // Tools for dealing with advancement UI.
 
 import { getTrailmanById, getTrailmen, Trailman } from './trailman';
-import { assertType, exists, july15, waitFor } from './util';
+import { assertType, exists, isLastYear, parseDate, waitFor } from './util';
 import * as ui from './ui';
 
 export function auditTrailmen(): string {
@@ -163,10 +163,10 @@ function setDetailsFromEvent(event: HTMLElement) {
 function splitDates() {
     // Highlight all check marks based on whether they're before or after Aug 1
   for (const event of document.querySelectorAll('td:has(.advance-icon[data-value="1"])')) {
-    const date = new Date((event as HTMLElement).querySelector('.completed_on_date')!.textContent).getTime();
+    const date = parseDate((event as HTMLElement).querySelector('.completed_on_date')!.textContent);
     (event as HTMLElement).style.setProperty(
       'background-color',
-      date < july15.getTime() ? '#faa' : '#afa',
+      isLastYear(date) ? '#faa' : '#afa',
       'important',
     );
   }

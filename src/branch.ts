@@ -49,7 +49,7 @@ export type ActivityType = v.InferOutput<typeof ActivityType>;
 export const ConcreteActivity = v.object({
   name: v.string(), // NOTE: may include "1 of 2" or "Year 1"
   type: ActivityType,
-  date: v.number(), // epoch millis
+  date: v.instance(Temporal.PlainDate),
   note: v.string(),
   // year: v.optional(v.number()),
   // index: v.optional(v.number()),

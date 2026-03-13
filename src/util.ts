@@ -21,15 +21,37 @@ export function downloadData(
   URL.revokeObjectURL(url);
 }
 
+export function isBefore(t1: Temporal.PlainDate, t2: Temporal.PlainDate): boolean {
+  return Temporal.PlainDate.compare(t1, t2) < 0;
+}
+
+export function isLastYear(t: Temporal.PlainDate): boolean {
+  return isBefore(t, july15);
+}
+
+export function isThisYear(t: Temporal.PlainDate): boolean {
+  return !isBefore(t, july15);
+}
+
+export function parseDate(s: string): Temporal.PlainDate {
+  const match = /^(\d\d?)\/(\d\d?)\/(\d\d\d?\d?)$/.exec(s);
+  if (!match) throw new Error(`Bad date string: ${s}`);
+  const [, monthStr, dayStr, yearStr] = match;
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const year = Number(yearStr!.length < 4 ? '20' + yearStr : yearStr);
+  return Temporal.PlainDate.from({month, day, year});
+}
+
+export const today: Temporal.PlainDate = Temporal.Now.plainDateISO();
+
 /**
  * The most recent July 15 (in the past).  This is useful for
  * determining whether a date was "this" year or "last" year.
  */
-export const july15: Date = (() => {
-    const now = new Date();
-    let d = new Date(now.getFullYear(), 6, 15);
-    if (now < d) d = new Date(now.getFullYear() - 1, 6, 15);
-    return d;
+export const july15: Temporal.PlainDate = (() => {
+  const thisJuly = today.with({month: 7, day: 15});
+  return isBefore(thisJuly, today) ? thisJuly : thisJuly.subtract({years: 1});
 })();
 
 /** Returns a promise that resolves after the given number of seconds */

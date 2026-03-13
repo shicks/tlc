@@ -35,5 +35,8 @@
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
+
+    // Language Level
+    "lib": ["dom", "dom.iterable", "esnext", "esnext.temporal"],
   }
 }
