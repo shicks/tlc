@@ -6,7 +6,7 @@
   "scripts": {
     "build": "bash -c 'mkdir -p dist; cat <(sed s/DATE/$(date +%Y%m%d)/ header.js) <(npx esbuild --tree-shaking --bundle src/index.ts) > dist/tlc.js'",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "watch": "nodemon --watch src --ext ts --exec \"npx tsgo && npm run build\""
+    "watch": "nodemon --watch src --ext ts --exec \"npx tsgo && npm run build || exit 1\""
   },
   "repository": {
     "type": "git",

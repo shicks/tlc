@@ -11,7 +11,7 @@ export interface DialogOpts<T> {
 }
 
 const RESOLVE: ButtonFn<void> = (resolve) => resolve();
-const CANCEL: ButtonFn<void> = (_resolve, reject) => reject(new Error('Cancalled'));
+const CANCEL: ButtonFn<any> = (_resolve, reject) => reject(new Error('Cancalled'));
 
 export class Dialog<T> {
   private readonly reject: (err: Error) => void;
@@ -98,10 +98,14 @@ export class Dialog<T> {
     });
   }
 
-  static textarea(text: string): Dialog<void> {
+  static textarea(
+    text: string,
+    buttons: Record<string, (value: string) => string> = {},
+  ): Dialog<void> {
     const e = document.createElement('textarea');
     e.value = text;
     e.spellcheck = false;
+    e.readOnly = true;
     Object.assign(e.style, {
       width: '800px',
       height: '600px',
@@ -110,22 +114,67 @@ export class Dialog<T> {
     return new Dialog<void>({
       contents: [e],
       buttons: {
-        Copy: () => navigator.clipboard.writeText(text),
+        ...Object.fromEntries(Object.entries(buttons).map(([label, action]) => {
+          return [label, () => e.value = action(e.value)];
+        })),
+        Copy: () => navigator.clipboard.writeText(e.value),
         OK: RESOLVE,
       },
       keys: {Escape: RESOLVE},
     });
   }
 
+  static editableTextarea(
+    text: string,
+    buttons: Record<string, (value: string) => string> = {},
+  ): Dialog<string> {
+    const e = document.createElement('textarea');
+    e.value = text;
+    e.spellcheck = false;
+    Object.assign(e.style, {
+      width: '800px',
+      height: '600px',
+      fontFamily: 'monospace',
+    });
+    const d = new Dialog<string>({
+      contents: [e],
+      buttons: {
+        ...Object.fromEntries(Object.entries(buttons).map(([label, action]) => {
+          return [label, () => e.value = action(e.value)];
+        })),
+        Cancel: CANCEL,
+        OK: (resolve) => resolve(e.value!),
+      },
+      keys: {Escape: CANCEL},
+    });
+    preventUnloadUntil(d.result);
+    return d;
+  }
+
   // TODO - prompt, etc
+}
+
+let preventUnloadCount = 0;
+window.addEventListener('beforeunload', (event) => {
+  if (preventUnloadCount <= 0) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+
+export function preventUnloadUntil(p: Promise<any>) {
+  preventUnloadCount++;
+  p.finally(() => {
+    preventUnloadCount--;
+  });
 }
 
 ////////////////////////////////////////////////////////////////
 
 function makeButton(
   label: string,
-  action: () => void,
-): HTMLButtonElement {
+  action: ButtonAction,
+): HTMLElement {
+  if (typeof action !== 'function') return makeSubmenu(label, action);
   const btn = document.createElement('button');
   btn.textContent = label;
   btn.addEventListener('click', (e) => {
@@ -143,9 +192,78 @@ function makeButton(
   return btn;
 }
 
+function makeSubmenu(
+  label: string,
+  items: ButtonActionMap,
+): HTMLElement {
+  const mainBtn = dom('button', {
+    textContent: `${label} ▼`,
+    // style: {
+    //   backgroundColor: '#4CAF50',
+    //   color: 'white',
+    //   padding: '10px 16px',
+    //   border: 'none',
+    //   cursor: 'pointer',
+    //   borderRadius: '4px',
+    //   fontWeight: 'bold'
+    // },
+  });
+  const menu = dom(
+    'div',
+    {
+      style: {
+        display: 'none', // Hidden by default
+        position: 'absolute',
+        right: '0',
+        backgroundColor: '#f9f9f9',
+        minWidth: '160px',
+        boxShadow: '0px 8px 16px 0px rgba(0,0,0,0.2)',
+        zIndex: '1',
+        borderRadius: '4px',
+        marginTop: '5px',
+        padding: '5px 0'
+      },
+    },
+    ...Object.entries(items).map(([key, action]) => {
+      const subBtn = makeButton(key, action);
+      Object.assign(subBtn.style, {
+        color: 'black',
+        padding: '12px 16px',
+        display: 'block',
+        width: '100%',
+        border: 'none',
+        background: 'none',
+        textAlign: 'left',
+        cursor: 'pointer',
+        transition: 'background 0.2s'
+      });
+      subBtn.addEventListener('mouseenter', () => subBtn.style.backgroundColor = '#f1f1f1');
+      subBtn.addEventListener('mouseleave', () => subBtn.style.backgroundColor = 'transparent');
+      subBtn.addEventListener('click', (e) => {
+        menu.style.display = 'none';
+        e.stopPropagation();
+      });
+      return subBtn;
+    }),
+  );
+  // 5. Toggle Logic
+  mainBtn.addEventListener('click', (e) => {
+    const isVisible = menu.style.display === 'block';
+    menu.style.display = isVisible ? 'none' : 'block';
+    e.stopPropagation();
+  });
+
+  // Close menu when clicking elsewhere
+  window.addEventListener('click', () => {
+    menu.style.display = 'none';
+  });
+
+  return dom('div', mainBtn, menu);
+}
+
 export function appendButtons(
   container: HTMLElement,
-  buttons: Record<string, () => void>,
+  buttons: ButtonActionMap,
 ): void {
   for (const [label, action] of Object.entries(buttons)) {
     if (container.firstChild) container.appendChild(document.createTextNode(' '));
@@ -155,7 +273,7 @@ export function appendButtons(
 
 function prependButtons(
   container: HTMLElement,
-  buttons: Record<string, () => void>,
+  buttons: ButtonActionMap,
 ): void {
   for (const [label, action] of Object.entries(buttons).reverse()) {
     if (container.firstChild) {
@@ -168,7 +286,7 @@ function prependButtons(
 type ElementSelector = string | RegExp | ((text: string) => boolean);
 export function addButtonsAfter(
   heading: ElementSelector,
-  buttons: Record<string, () => void>,
+  buttons: ButtonActionMap,
 ): void {
   const span = document.createElement('span');
   appendButtons(span, buttons);
@@ -186,9 +304,14 @@ export function addButtonsAfter(
   }
 }
 
+interface ButtonActionMap {
+  [label: string]: ButtonAction;
+}
+type ButtonAction = (() => any) | ButtonActionMap;
+
 export function insertButtonsAtStart(
   selector: string,
-  buttons: Record<string, () => void>,
+  buttons: ButtonActionMap,
 ): void {
   const [container, ...rest] = document.querySelectorAll(selector);
   assertType<HTMLElement>(container);
@@ -197,7 +320,7 @@ export function insertButtonsAtStart(
   prependButtons(container, buttons);
 }
 
-export function addButtonsToTop(buttons: Record<string, () => void>): void {
+export function addButtonsToTop(buttons: ButtonActionMap): void {
   const bar = document.querySelector('.nav.navbar-nav.navbar-left')!;
   for (const [label, action] of Object.entries(buttons)) {
     const li = document.createElement('li');
@@ -224,7 +347,7 @@ export function pickElement(query: string, name = 'valid element'): Promise<HTML
 
 interface ExtraAttrs {
   parent: Element;
-  style: string;
+  style: string|Record<string, string>;
 }
 type DomAttrs<E> = {
   [K in keyof E|keyof ExtraAttrs]?:
@@ -251,6 +374,8 @@ export function dom(tag: string, ...rest: any[]): Node {
       for (const [key, val] of Object.entries(attr)) {
         if (key === 'parent') {
           (val as HTMLElement).appendChild(e);
+        } else if (key === 'style' && typeof val === 'object') {
+          Object.assign((e as any).style, val);
         } else if (key.startsWith('on')) {
           e.addEventListener(key.substring(2), val as any);
         } else {

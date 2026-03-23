@@ -34,13 +34,24 @@ export function isThisYear(t: Temporal.PlainDate): boolean {
 }
 
 export function parseDate(s: string): Temporal.PlainDate {
-  const match = /^(\d\d?)\/(\d\d?)\/(\d\d\d?\d?)$/.exec(s);
-  if (!match) throw new Error(`Bad date string: ${s}`);
+  const match = /^(\d\d?)\/(\d\d?)\/(\d\d(?:\d\d)?)$/.exec(s);
+  if (!match) {
+    try {
+      return Temporal.PlainDate.from(s);
+    } catch {
+      throw new Error(`Bad date string: ${s}`);
+    }
+  }
   const [, monthStr, dayStr, yearStr] = match;
   const month = Number(monthStr);
   const day = Number(dayStr);
   const year = Number(yearStr!.length < 4 ? '20' + yearStr : yearStr);
   return Temporal.PlainDate.from({month, day, year});
+}
+
+export function toSlash(d: Temporal.PlainDate): string {
+  const {month, day, year} = d;
+  return `${month}/${day}/${String(year - 2000).padStart(2, '0')}`;
 }
 
 export const today: Temporal.PlainDate = Temporal.Now.plainDateISO();
@@ -83,4 +94,26 @@ export function queryAll(query: string): HTMLElement[];
 export function queryAll<E extends Element = HTMLElement>(query: string, ctor: {new(): E, prototype: E}): E[];
 export function queryAll(query: string, ctor = HTMLElement): Element[] {
   return [...document.querySelectorAll(query)].filter(e => e instanceof ctor);
+}
+
+export function timeout(duration: Temporal.Duration, {signal}: {signal?: AbortSignal} = {}): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    function abort() {
+      reject(signal!.aborted);
+      clearTimeout(id);
+    }
+    const id = setTimeout(() => {
+      if (signal) {
+        if (signal.aborted) {
+          return reject(signal.aborted);
+        }
+        signal.removeEventListener('abort', abort);
+      }
+      resolve();
+    }, duration.total({
+      unit: 'millisecond',
+      relativeTo: Temporal.Now.zonedDateTimeISO(),
+    }));
+    signal?.addEventListener('abort', abort, {once: true});
+  });
 }

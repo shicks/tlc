@@ -1,34 +1,116 @@
 // Analysis of advancement grid to figure out what everybody needs.
 
-import { getSubpatrols, getTrailmanById, getTrailmen, getTrailmenBySubpatrol, Trailman, TrailmanId } from './trailman';
+import { scrapeProgress, switchBranch } from './advancement';
 import {
   BRANCHES,
   Branch,
   type BranchData,
   ConcreteActivity,
-  HERITAGE,
-  HOBBIES,
-  LIFE,
-  OUTDOOR,
-  SCIENCE,
-  SPORTS,
-  VALUES,
+  // HERITAGE,
+  // HOBBIES,
+  // LIFE,
+  // OUTDOOR,
+  // SCIENCE,
+  // SPORTS,
+  // VALUES,
+  getBranchData,
   scrapeBranch,
 } from './branch';
-import { switchBranch } from './advancement';
-import { assertType, isLastYear, isThisYear, parseDate, today } from './util';
+import { Db } from './db';
+import {
+  TrailmanId,
+  getSubpatrols,
+  getTrailmanById,
+  getTrailmen,
+  getTrailmenBySubpatrol,
+} from './trailman';
+import {
+  isBefore,
+  isLastYear,
+  isThisYear,
+  parseDate,
+  toSlash,
+  today,
+} from './util';
 import { Dialog, addButtonsToTop } from './ui';
+import * as v from 'valibot';
 
-const upcoming = {
-  // TODO - convert to a calendar, only add if after today
-  [HERITAGE]: [],
-  [LIFE]: [],
-  [SCIENCE]: ['Rocketry'],
-  [HOBBIES]: ['Elective - %y (1 of 2)', 'Elective - %y (2 of 2)'],
-  [VALUES]: ['Service'],
-  [SPORTS]: ['Nutrition & Fitness - %y', 'Uncommon Sports', 'HTT'],
-  [OUTDOOR]: ['Orienteering', 'Tread Lightly!®'],
-};
+import PlainDate = Temporal.PlainDate;
+
+const ActivityName = v.string();
+const Date = v.pipe(v.string(), v.transform(parseDate));
+const Dates = v.pipe(v.array(Date), v.readonly());
+const BranchCalendar = v.pipe(v.record(ActivityName, Dates), v.readonly());
+type BranchCalendar = v.InferOutput<typeof BranchCalendar>;
+const Calendar = v.pipe(v.record(Branch, BranchCalendar), v.readonly())
+type Calendar = v.InferOutput<typeof Calendar>;
+
+const calDb = new Db<Calendar>(
+  '__sdh__calendar',
+  Calendar, // TODO - the parseDate transform is one-way, won't serialize
+  {},
+  {
+    replacer(_key: string, val: unknown): unknown {
+      return val instanceof PlainDate ? String(val) : val;
+    },
+  },
+);
+
+// type ActivityName = v.InferOutput<typeof ActivityName>;
+// type DateString = string;
+// const upcoming: Record<Branch, Record<ActivityName, DateString>> = {
+//   // TODO - convert to a calendar, only add if after today
+//   [HERITAGE]: {
+//     'Christian Heritage': '9/8/25',
+//     'Flag Etiquette and History': '9/29/25',
+//     'Early America': '10/6/25',
+//     'HTT: National Mall Scavenger Hunt': '9/13/25',
+//   },
+//   [LIFE]: {
+//     'First Aid - Traumatic': '10/20/25',
+//     'Map Skills': '10/27/25',
+//     'Personal Safety': '11/17/25',
+//     'Repairs': '11/3/25',
+//     'HTT: Bull Run Hike': '11/15/25',
+//     'HTT: Nova Labs': '11/22/25',
+//   },
+//   [SCIENCE]: {
+//     'Know Your Environment': '2/2/26',
+//     'Science in Weather': '2/9/26',
+//     'Rocketry': '4/27/26',
+//     'HTT: Lego Brick Derby': '2/28/26',
+//   },
+//   [HOBBIES]: {
+//     'General Hobbies - %y': '1/5/26',
+//     'Elective - %y (1 of 2)': '5/31/26', // '2/23/26',
+//     'Elective - %y (2 of 2)': '4/20/26',
+//     'HTT: Board Games': '1/24/26',
+//   },
+//   [VALUES]: {
+//     'Godly Values': '12/1/25',
+//     'Our Faith': '12/8/25',
+//     'Service': '5/31/26', // '1/26/26',
+//     'Dedication': '1/12/26',
+//     'HTT: Supreme Court Living Nativity': '12/4/25',
+//     'HTT: Wreaths Across America': '12/13/25',
+//   },
+//   [SPORTS]: {
+//     'Nutrition & Fitness - %y': '3/9/26',
+//     'Learn about Sports - %y': '3/2/26',
+//     'Uncommon Sports': '3/16/26',
+//     'HTT: GMU Basketball Game': '1/10/26',
+//     'HTT: Monthly Hike': '3/14/26',
+//   },
+//   [OUTDOOR]: {
+//     'Ropes & Knots': '9/15/25',
+//     'Outdoor Cooking': '9/22/25',
+//     'Orienteering': '4/13/26',
+//     'Fire Safety': '9/20/25', // NOTE: Or 10/4/25 from ML campout
+//     'Tread Lightly!®': '3/23/26',
+//     'HTT: Burke Lake Hike': '10/18/25',
+//     'HTT: IBC Fall Fest': '10/25/25',
+//   },
+// };
 
 // // Trailman interface augmented with advancement progress data
 // interface TrailmanData extends Trailman {
@@ -164,15 +246,15 @@ class CompletedActivities {
  */
 export function checkBranchProgress(
   branchData: BranchData,
-  upcoming: string[],
+  upcoming: BranchCalendar,
   completed: ConcreteActivity[],
   year: number,
 ): StructuredProgress {
-  const activitiesByName = new Map([...branchData.activities.values()].map(a => [a.name, a]));
-  const upcomingActivities: ConcreteActivity[] = upcoming.map(name => {
-    const type = name === 'HTT' ? 'htt' : activitiesByName.get(name.replace('%y', 'Year 1'))?.type;
+  const activitiesByName = new Map(Object.values(branchData.activities).map(a => [a.name, a]));
+  const upcomingActivities: ConcreteActivity[] = Object.entries(upcoming).flatMap(([name, dates]) => {
+    const type = name.startsWith('HTT') ? 'htt' : activitiesByName.get(name.replace('%y', 'Year 1').replace(/:.*/, ''))?.type;
     if (!type) throw new Error(`Unknown upcoming activity: ${name}`);
-    return {name, type, note: '', date: today};
+    return dates.filter(d => isBefore(d, today)).map(date => ({name, type, note: '', date}));
   });
   let goal: 'branch'|'star' = year === 1 ? 'branch' : 'star';
 
@@ -208,33 +290,120 @@ export function checkBranchProgress(
   return check;
 }
 
-export function scrapeProgress(
-  branchData: BranchData,
-): Map<Trailman, ConcreteActivity[]> {
-  const map = new Map(getTrailmen().map(t => [t, []]));
-  for (const e of document.querySelectorAll('.advance-icon[data-value="1"]')) {
-    assertType<HTMLElement>(e);
-    const [activityId, trailmanId, levelId] = e.id.split(/_/g);
-    if (!levelId) throw new Error(`Bad id: ${e.id}`); // TODO - validate?
-    const activity = branchData.activities.get(activityId!);
-    if (!activity) throw new Error(`Unknown activity: ${activityId}`);
-    const {name, type} = activity;
-    const trailman = getTrailmanById(trailmanId!);
-    if (!trailman) throw new Error(`Unknown trailman: ${trailmanId}`);
-    const note = (e.firstChild as HTMLElement).dataset.originalTitle
-      ?.replace(/^.*?<br>/, '') || '';
-    const dateElem = e.nextElementSibling;
-    if (!dateElem?.classList.contains('completed_on_date')) {
-      throw new Error(`Could not find completion date for activity`);
+export async function editCalendar() {
+  // Allow editing the calendar of all planned core steps/electives/htts.
+  const calendar = calDb.get();
+  let calendarText: string = formatCalendar(calendar, true);
+  while (true) {
+    try {
+      calendarText = await Dialog.editableTextarea(calendarText, {
+        Sparse(text: string) {
+          try {
+            return formatCalendar(parseCalendar(text), true);
+          } catch {
+            return text;
+          }
+        },
+        Dense(text: string) {
+          try {
+            return formatCalendar(parseCalendar(text), false);
+          } catch {
+            return text;
+          }
+        },
+      });
+    } catch {
+      return;
     }
-    const date = parseDate(dateElem.textContent);
-    const completed: ConcreteActivity[] = map.get(trailman)!;
-    completed.push({name, type, date, note});
+    try {
+      const newCal = parseCalendar(calendarText);
+      calDb.set(newCal);
+      return;
+    } catch (err: unknown) {
+      await Dialog.confirm((err as Error)?.message);
+    }
   }
-  return map;
 }
 
-export async function analyze() {
+function formatCalendar(c: Calendar, sparse = false): string {
+  const blocks = [`# Add dates of the form MM/DD/YY after the equal signs.
+# Multiple dates for an event can be separated with commas.`,];
+  for (const branch of BRANCHES) {
+    const block = [`[${branch}]`];
+    // Read the branch data
+    const branchData = getBranchData(branch);
+    type Entries = [string, readonly PlainDate[]][];
+    const coreSteps = new Map<string, Entries>();
+    const electives = new Map<string, Entries>();
+    const htts: Entries = [];
+    for (const activity of Object.values(branchData.activities)) {
+      const name = activity.name.replace(/Year [12]/, '%y');
+      if (activity.type === 'core') coreSteps.set(name, []);
+      if (activity.type === 'elective') electives.set(name, []);
+    }
+    // Read the calendar
+    for (const [activity, dates] of Object.entries(c[branch] || {})) {
+      const prefix = activity.replace(/:.*/, '').trim();
+      const entry = coreSteps.get(prefix) || electives.get(prefix);
+      if (prefix === 'HTT') {
+        htts.push([activity, dates]);
+      } else if (entry) {
+        entry.push([activity, dates]);
+      } else {
+        throw new Error(`Unknown calendar entry: ${activity}\n${[...coreSteps].map(([k,v])=>`${k} => ${v}`).join('\n')}`);
+      }        
+    }
+    // Format the calendar
+    function formatDate(d: PlainDate): string {
+      return `${d.month}/${d.day}/${d.year}`;
+    }
+    function addEntry(fallbackName: string, entries: Entries) {
+      for (const [name, dates] of entries) {
+        if (!sparse || dates.length) {
+          block.push(`${name} = ${dates.map(formatDate).join(', ')}`);
+        }
+      }
+      if (!entries.length && !sparse) {
+        block.push(`${fallbackName} =`);
+      }
+    }
+    for (const [coreStep, activities] of coreSteps) {
+      addEntry(coreStep, activities);
+    }
+    for (const [elective, activities] of electives) {
+      addEntry(elective, activities);
+    }
+    if (sparse && block.length === 1) continue;
+    addEntry('HTT', htts);
+    blocks.push(block.join('\n'));
+  }
+  return blocks.join('\n\n');
+}
+
+function parseCalendar(s: string): Calendar {
+  // TODO - errors for unknown activities???
+  const calendar = Object.fromEntries(BRANCHES.map(b => [b, {}]));
+  let branchCal: Record<string, PlainDate[]>|undefined = undefined;
+  for (const orig of s.trim().split(/\n+/g)) {
+    const line = orig.replace(/#.*$/, '').trim();
+    if (!line) continue;
+    const branchLine = /\[(.*)\]$/.exec(line);
+    if (branchLine) {
+      branchCal = calendar[branchLine[1] as Branch];
+      if (!branchCal) throw new Error(`Invalid branch line: ${line}`);
+    }
+    const activityLine = /^(.*)=\s*(.*)$/.exec(line);
+    if (activityLine) {
+      if (!branchCal) throw new Error(`Activity line without branch`);
+      const name = activityLine[1]!.trim();
+      const dates = activityLine[2]!.split(/\s*,\s*/g).filter(x => x).map(parseDate);
+      branchCal[name] = dates;
+    }
+  }
+  return calendar;
+}
+
+export async function analyzeProgress() {
   // Compute Forest Award status
   const badge = new Map<TrailmanId, string>();
   for (const patrol of ['Fox', 'Hawk', 'Mountain Lion']) {
@@ -270,7 +439,7 @@ export async function analyze() {
     const branchData = scrapeBranch();
     for (const [t, activities] of scrapeProgress(branchData)) {
       reports.get(t.id)!
-        .set(branch, checkBranchProgress(branchData, upcoming[branch], activities, t.year));
+        .set(branch, checkBranchProgress(branchData, calDb.get()[branch]!, activities, t.year));
     }
   }
 
@@ -347,9 +516,127 @@ export async function analyze() {
   Dialog.textarea(report.map(row => row.join('\t')).join('\n'));
 }
 
+export async function exportAttendance() {
+  // TODO - do we care about forest award status? if so, copy?
+
+  // Iterate over the branches to get progress.
+  interface Report {
+    map: Map<string, PlainDate>;
+    completed: CompletedActivities;
+  }
+  const reports = new Map<TrailmanId, Map<Branch, Report>>(
+    getTrailmen().map(t => [t.id, new Map()]),
+  );
+  const extraHtt = new Map<TrailmanId, number>();
+  for (const branch of BRANCHES) {
+    await switchBranch(branch);
+    const branchData = scrapeBranch();
+    for (const [t, activities] of scrapeProgress(branchData)) {
+      const map = new Map<string, PlainDate>();
+      const completed = new CompletedActivities(t.year, activities);
+      extraHtt.set(t.id, (extraHtt.get(t.id) || 0) + completed.extraHtt);
+      for (const a of activities) {
+        const name = a.type === 'htt' ? `HTT: ${String(a.date)}` : a.name;
+        const prev = map.get(name);
+        if (!prev || isBefore(prev, a.date)) map.set(name, a.date);
+      }
+      reports.get(t.id)!.set(branch, {map, completed});
+    }
+  }
+
+  // Set up the column headers (=trailmen)
+  const columns = [
+    'Branch',   // TODO - merge
+    'Activity',
+    'Date',
+  ];
+  const row0 = ['', '', ''];
+  const extraHttRow = ['', 'Extra HTT', ''];
+  const data = [row0, columns, extraHttRow];
+  const trailmenIds: TrailmanId[] = [];
+  for (const patrol of getSubpatrols()) {
+    for (const trailman of [...getTrailmenBySubpatrol(patrol)!].sort((a, b) => {
+      return a.lastName < b.lastName ? -1 : a.lastName > b.lastName ? 1 :
+        a.firstName < b.firstName ? -1 : a.firstName > b.firstName ? 1 : 0;
+    })) {
+      row0.push(trailman.subpatrol);
+      columns.push(`${trailman.lastName}, ${trailman.firstName}`);
+      extraHttRow.push(String(extraHtt.get(trailman.id) || 0));
+      trailmenIds.push(trailman.id);
+    }
+  }
+
+  // Look at calendar
+  const calendar = calDb.get();
+  for (const branch of BRANCHES) {
+    // First format the activities
+    for (const [activity, dates] of Object.entries(calendar[branch] || {})) {
+      const date = dates[0]!; // TODO - handle multiple dates reasonably?
+      const name = activity.startsWith('HTT:') ?
+        `HTT: ${String(date)}` :
+        activity.replace(/:.*/, '');
+      const row = [branch, activity, toSlash(date)];
+      for (const tid of trailmenIds) {
+        const {year} = getTrailmanById(tid)!;
+        const report = reports.get(tid)!.get(branch)!;
+        const date = report.map.get(name.replace('%y', `Year ${year}`));
+        row.push(date ? toSlash(date) : '');
+      }
+      data.push(row);
+    }
+    // Then format the counts
+    const bi = getBranchData(branch);
+    const core = [branch, `# Core Steps (${bi.needCoreSteps})`, ''];
+    const elective = [branch, `# Electives (${bi.needElectives})`, ''];
+    const htt = [branch, `# HTT (1)`, ''];
+    const home = [branch, `# Home/2`, ''];
+    const homeEligible = [branch, `Home Eligible`, ''];
+    for (const tid of trailmenIds) {
+      const report = reports.get(tid)!.get(branch)!.completed;
+      core.push(String(report.coreSteps.size || ''));
+      elective.push(String(report.electives.size || ''));
+      htt.push(String(report.htt || ''));
+      home.push(String((report.home >>> 1) || ''));
+      homeEligible.push(report.homeFree ? 'Y' : '');
+    }
+    data.push(core, elective, htt, home, homeEligible);
+  }
+  // Make TSV
+  let transposed = false;
+  Dialog.textarea(data.map(row => row.join('\t')).join('\n'), {
+    Transpose() {
+      transposed = !transposed;
+      return (transposed ? transpose(data) : data).map(r => r.join('\t')).join('\n');
+    },
+  });
+  function transpose<T>(arr: readonly T[][]): readonly T[][] {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = 0; j < arr[i]!.length; j++) {
+        (out[j] || (out[j] = []))[i] = arr[i]![j]!;
+      }
+    }
+    return out;
+  }
+}
+
+
+async function scrapeAllBranches() {
+  for (const b of BRANCHES) {
+    await switchBranch(b);
+    scrapeBranch();
+  }
+}
+
 function installUi() {
   addButtonsToTop({
-    Analyze: analyze,
+    Analyze: {
+      'Scrape': scrapeBranch,
+      'Scrape All': scrapeAllBranches,
+      'Edit Calendar': editCalendar,
+      'Analyze Progress': analyzeProgress,
+      'Export Attendance': exportAttendance,
+    },
   });
 }
 const URL_PREFIX = 'https://www.traillifeconnect.com/advancement';

@@ -1,5 +1,5 @@
 import * as v from 'valibot';
-import {Db} from './db';
+import { Db } from './db';
 
 export const PATROLS = ['Fox', 'Hawk', 'Mountain Lion'];
 export const Patrol = v.picklist(PATROLS);
@@ -31,12 +31,14 @@ const db = new Db<readonly Trailman[]>(
   '__sdh__trailmen',
   v.pipe(v.array(Trailman), v.readonly()),
   [],
-  (trailmen: readonly Trailman[]) => {
-    byId = new Map(trailmen.map(t => [t.id, t]));
-    byName = new Map(trailmen.map(t => [t.id, t]));
-    byPatrol = Map.groupBy(trailmen, t => t.patrol);
-    byYear = Map.groupBy(trailmen, t => t.year);
-    bySubpatrol = Map.groupBy(trailmen, t => t.subpatrol);
+  {
+    onUpdate(trailmen: readonly Trailman[]) {
+      byId = new Map(trailmen.map(t => [t.id, t]));
+      byName = new Map(trailmen.map(t => [t.id, t]));
+      byPatrol = Map.groupBy(trailmen, t => t.patrol);
+      byYear = Map.groupBy(trailmen, t => t.year);
+      bySubpatrol = Map.groupBy(trailmen, t => t.subpatrol);
+    },
   },
 );
 

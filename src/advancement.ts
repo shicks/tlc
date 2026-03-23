@@ -1,8 +1,34 @@
 // Tools for dealing with advancement UI.
 
-import { getTrailmanById, getTrailmen, Trailman } from './trailman';
+import { ActivityId, Branch, BranchData, ConcreteActivity, getOrScrapeBranchData, selectedBranchName } from './branch';
+import { Db } from './db';
+import { getTrailmanById, getTrailmen, Trailman, TrailmanId } from './trailman';
 import { assertType, exists, isLastYear, parseDate, waitFor } from './util';
 import * as ui from './ui';
+import * as v from 'valibot';
+import { addDocumentChangeListener, handleDocumentChangeImmediately } from './observer';
+
+// TODO - understand how to split out EXTRA from the HTT comments
+const AdvancementRecord = v.pipe(v.object({
+  trailman: TrailmanId,
+  activity: ActivityId,
+  concrete: ConcreteActivity,
+}), v.readonly());
+const Advancements =
+  v.pipe(v.record(
+    Branch,
+    v.pipe(v.record(
+      TrailmanId,
+      v.array(ConcreteActivity),
+    ), v.readonly())
+  ), v.readonly());
+type Advancements = v.InferOutput<typeof Advancements>;
+const advancementsDb = new Db<Advancements>(
+  '__sdh__advancements',
+  Advancements,
+  {},
+);
+const [] = [advancementsDb];
 
 export function auditTrailmen(): string {
   const errors = [];
@@ -38,6 +64,38 @@ function checkCurrentLevel() {
          .includes('Trailman\'s Current Level')) {
     throw new Error(`Not in Grid View`);
   }
+}
+
+/** Scrape the progress displayed on the current page. */
+export function scrapeProgress(
+  branchData: BranchData,
+): Map<Trailman, ConcreteActivity[]> {
+  const selectedTrailmenIds =
+    new Set([...document.querySelectorAll('th[data-user-id]')]
+              .map(th => (th as HTMLElement).dataset.userId));
+  const selectedTrailmen =
+    getTrailmen().filter(t => selectedTrailmenIds.has(t.id));
+  const map = new Map(selectedTrailmen.map(t => [t, []]));
+  for (const e of document.querySelectorAll('.advance-icon[data-value="1"]')) {
+    assertType<HTMLElement>(e);
+    const [activityId, trailmanId, levelId] = e.id.split(/_/g);
+    if (!levelId) throw new Error(`Bad id: ${e.id}`); // TODO - validate?
+    const activity = branchData.activities[activityId!];
+    if (!activity) throw new Error(`Unknown activity: ${activityId}`);
+    const {name, type} = activity;
+    const trailman = getTrailmanById(trailmanId!);
+    if (!trailman) throw new Error(`Unknown trailman: ${trailmanId}`);
+    const note = (e.firstChild as HTMLElement).dataset.originalTitle
+      ?.replace(/^.*?<br>/, '') || '';
+    const dateElem = e.nextElementSibling;
+    if (!dateElem?.classList.contains('completed_on_date')) {
+      throw new Error(`Could not find completion date for activity`);
+    }
+    const date = parseDate(dateElem.textContent);
+    const completed: ConcreteActivity[] = map.get(trailman)!;
+    completed.push({name, type, date, note});
+  }
+  return map;
 }
 
 /**
@@ -113,6 +171,7 @@ export async function switchBranch(branch: string): Promise<boolean> {
   await waitFor(() =>
     queries.flatMap(q => [...document.querySelectorAll(q)])
       .some(e => e.textContent.includes(branch)));
+  handleDocumentChangeImmediately();
   return true;
 }
 
@@ -199,6 +258,36 @@ async function filterByRow() {
 //     return names.filter(n => n !== ancestor.textContent.trim());
 // };
 
+function updateMemoizedProgress() {
+
+
+
+  if (1 < 2) return; // TODO - this is a mess!
+
+
+
+  const [] = [AdvancementRecord];
+  const branch = selectedBranchName();
+  if (!v.is(Branch, branch)) {
+    // TODO - update award status
+    return;
+  }
+  const data = getOrScrapeBranchData(branch);
+  const progress = scrapeProgress(data);
+
+  // BUT... what about EXTRA htt? doesn't map to ID :-(
+
+  advancementsDb.update(a => ({
+    ...a,
+    [branch]: {
+      ...a[branch],
+      ...Object.fromEntries([...progress].map(([t, a]) => [t.id, a])),
+    },
+  }));
+
+}
+addDocumentChangeListener('/advancement/index', updateMemoizedProgress);
+
 function installUi() {
   // Listen for top-level ctrl-click events, for "pick" action.
   document.body.addEventListener(
@@ -225,25 +314,16 @@ function installUi() {
     'Year 1'() { selectByFilter((t: Trailman) => t.year === 1); },
     'Year 2'() { selectByFilter((t: Trailman) => t.year === 2); },
     'All'() { selectByFilter(() => true); },
-    // ['Filter', filter],
-    // ['Remove', removeOne],
   });
   ui.addButtonsToTop({
-    Filter: filterByRow,
-    Pick: pickEventDetails,
-    Split: splitDates,
+    'Filter': filterByRow,
+    'Pick': pickEventDetails,
+    'Split': splitDates,
+    'Uncheck all': uncheckAll,
+    'Check all': checkAll,
   });
-
-  // Add a button to uncheck all.
-  ui.addButtonsAfter('Lock current completed', {'Uncheck all': uncheckAll});
-  ui.addButtonsAfter('Show dates', {'Check all': checkAll});
-  // ui.addButtonsAfter('Track date:', {
-  //   Pick: pickEventDetails,
-  //   // Split: splitDates,
-  //   // Export: exportBranch,
-  // });
-
 }
 
 const URL_PREFIX = 'https://www.traillifeconnect.com/advancement';
 if (window.location.href.startsWith(URL_PREFIX)) installUi();
+

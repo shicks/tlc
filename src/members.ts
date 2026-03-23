@@ -6,6 +6,7 @@ import { getSubpatrols, getTrailmen, getTrailmenBySubpatrol, Patrol, storeTrailm
 import { assert, assertType, july15, parseDate } from './util';
 import * as ui from './ui';
 import * as v from 'valibot';
+import { addDocumentChangeListener } from './observer';
 
 const somePatrol = /Fox|Hawk|Mountain Lion/;
 
@@ -72,6 +73,7 @@ export function scrapeTrailmen(): number {
   storeTrailmen(trailmenArr);
   return updateCount;
 }
+addDocumentChangeListener('/user/index', scrapeTrailmen);
 
 function objDiffers(a: object, b: object): boolean {
   for (const k in a) {
