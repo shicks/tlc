@@ -17,6 +17,7 @@ import {
   scrapeBranch,
 } from './branch';
 import { Db } from './db';
+import { MessageStore } from './emailqueue';
 import {
   TrailmanId,
   getSubpatrols,
@@ -186,8 +187,8 @@ class CompletedActivities {
     const homeFree = this.homeFree;
     const possible =
       homeFree ?
-      missingCse < 2 && missingCse + missingHtt < 3 :
-      missingCse === 0 && missingHtt < 2;
+      missingCse <= 1 && missingCse + missingHtt <= 2 :
+      missingCse === 0 && missingHtt <= 1;
     return {
       goal,
       complete,
@@ -404,6 +405,7 @@ function parseCalendar(s: string): Calendar {
 }
 
 export async function analyzeProgress() {
+  const db = await MessageStore.open();
   // Compute Forest Award status
   const badge = new Map<TrailmanId, string>();
   for (const patrol of ['Fox', 'Hawk', 'Mountain Lion']) {
@@ -451,6 +453,7 @@ export async function analyzeProgress() {
     'Missing',
     ...BRANCHES,
   ]];
+  const emails = new Map<string, string[]>();
   for (const patrol of getSubpatrols()) {
     for (const trailman of getTrailmenBySubpatrol(patrol)!) {
       const row = [
@@ -458,6 +461,14 @@ export async function analyzeProgress() {
         patrol.replace('Mountain Lion', 'ML'),
         badge.get(trailman.id) || 'none',
       ];
+      const subject = `Progress report for ${trailman.firstName} ${trailman.lastName} (${patrol})`;
+      const email = [
+        `<h2>${subject}</h2>`,
+        `<p>Please see below for a progress report on Woodlands Branch activities.
+You can view more details on Trail Life Connect.  See <a href="https://www.traillifeconnect.com/getdoc/docntsarqqlm">this tutorial</a> for a walkthrough of how to use it, or feel free to reach out to me if you have any questions!</p>`,
+        '<ul>',
+      ];
+      emails.set(trailman.id, email);
       // First count the extra HTT so that we can use them strategically
       let doneExtraHtt = 0;
       let maybeExtraHtt = 0;
@@ -491,10 +502,12 @@ export async function analyzeProgress() {
         const progress = reports.get(trailman.id)!.get(branch)!;
         doneExtraHtt += progress.completedExtraHtt;
         maybeExtraHtt += progress.upcomingExtraHtt;
+        const goal = progress.goal === 'star' ? 'Sylvan Star' : 'Branch Pin';
         if (progress.onTrack) {
           let msg = `${progress.goal} ${progress.complete ? 'done' : 'on track'}`;
           if (progress.completedExtraHtt < 0) msg += ' using extra HTT';
           branchCells.push(msg);
+          email.push(`<li>${branch}: ${progress.complete ? 'Requirements complete' : 'On track'} for ${goal}`);
           missingBranch--;
         } else {
           const no = !progress.possible;
@@ -506,14 +519,22 @@ export async function analyzeProgress() {
             missing.push(`${progress.missingHtt} htt`);
           }
           branchCells.push(`${no ? 'no ' : ''}${progress.goal}: ${missing.join(' ') || 'unknown'}`); 
+          if (progress.possible) {
+            const needed = progress.missingCse && progress.missingHtt ? 'Need family home activities AND make-up Hit the Trail' : progress.missingHtt ? 'Need family home activities OR make-up Hit the Trail' : progress.missingCse ? 'Need family home activies' : `Unknown status: "${missing.join(' ')}"`;
+            email.push(`<li>${branch}: ${needed} for ${goal}`);
+          } else {
+            email.push(`<li>${branch}: ${goal} not possible`);
+          }
         }
       }
+      email.push(`</ul><p>Walk Worthy,<br>&nbsp;&nbsp;&nbsp;&nbsp;Steve Hicks</p>`);
       row.push(String(missingBranch), ...branchCells);
       report.push(row);
     }
   }
   // Make TSV
-  Dialog.textarea(report.map(row => row.join('\t')).join('\n'));
+  //Dialog.textarea(report.map(row => row.join('\t')).join('\n'));
+  Dialog.textarea([...emails.values()].map(e => e.join('\n')).join('\n\n\n'));
 }
 
 export async function exportAttendance() {
