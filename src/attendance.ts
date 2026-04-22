@@ -102,7 +102,7 @@ function processFile(file: File) {
 function handle(text: string) {
   processCsv(Papa.parse(text, {
     header: true,
-    transformHeader: (h: string) => h.trim().toLowerCase(),
+    transformHeader: (h: string) => h.replace(/\s/g, '').toLowerCase(),
     skipEmptyLines: true,
   }).data as Array<Record<CsvHeader, string>>);
 }
@@ -133,8 +133,13 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   const corrections = getCorrections()
   for (const entry of data) {
     // Only look at trailmen
-    if (!/Trail Life - (Foxes|Hawks|Mountain Lions)/.test(entry.group)) continue;
-    const group = entry.group.replace('Trail Life - ', '');
+    if (
+      entry.group &&
+        !/Trail Life - (Foxes|Hawks|Mountain Lions)/.test(entry.group)
+    ) {
+      continue;
+    }
+    const group = (entry.group || 'n/a').replace('Trail Life - ', '');
     let name = `${entry.lastname}, ${entry.firstname}`;
     if (name in corrections) name = corrections[name];
     if (name === 'IGNORE') continue;
