@@ -251,6 +251,19 @@ async function filterByRow() {
     return selectTrailmen(checked);
 };
 
+async function filterOutByRow() {
+    const row = await pickRow();
+    const isAttendance = row?.firstChild?.textContent === 'Attended Event';
+    const query = isAttendance ? 'i.fa-check' : '.advance-icon[data-value="0"]';
+    const checked = [...row.querySelectorAll(query)].flatMap((el) => {
+        const id = el.id.split(isAttendance ? /-/g : /_/g)[1];
+        const header = document.querySelector(`tbody#table_header th[data-user-id="${id}"]`);
+        if (!header) return [];
+        return [header.textContent.trim()];
+    });
+    return selectTrailmen(checked);
+};
+
 // async function removeOneTrailman() {
 //     const headers = [...document.querySelectorAll('tbody#table_header th[data-user-id]')];
 //     const names = headers.map(h => h.textContent.trim());
@@ -317,6 +330,7 @@ function installUi() {
   });
   ui.addButtonsToTop({
     'Filter': filterByRow,
+    'Filter Out': filterOutByRow,
     'Pick': pickEventDetails,
     'Split': splitDates,
     'Uncheck all': uncheckAll,
