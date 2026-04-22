@@ -17,7 +17,7 @@ import {
   scrapeBranch,
 } from './branch';
 import { Db } from './db';
-import { MessageStore } from './emailqueue';
+//import { MessageStore } from './emailqueue';
 import {
   TrailmanId,
   getSubpatrols,
@@ -405,7 +405,7 @@ function parseCalendar(s: string): Calendar {
 }
 
 export async function analyzeProgress() {
-  const db = await MessageStore.open();
+  //const db = await MessageStore.open();
   // Compute Forest Award status
   const badge = new Map<TrailmanId, string>();
   for (const patrol of ['Fox', 'Hawk', 'Mountain Lion']) {
