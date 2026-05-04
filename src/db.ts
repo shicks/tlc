@@ -4,7 +4,6 @@ import * as v from 'valibot';
 
 interface DbOptions<T> {
   onUpdate?: (value: T) => void;
-  replacer?: (key: string, val: unknown) => unknown;
 }
 
 export class Db<T> {
@@ -13,7 +12,6 @@ export class Db<T> {
   private value: T|undefined = undefined;
 
   private readonly onUpdate: (value: T) => void;
-  private readonly replacer: ((key: string, val: unknown) => unknown) | undefined;
 
   constructor(
     private readonly key: string,
@@ -22,7 +20,6 @@ export class Db<T> {
     opts: DbOptions<T> = {},
   ) {
     this.onUpdate = opts?.onUpdate || (() => {});
-    this.replacer = opts?.replacer;
   }
 
   markFresh() {
@@ -35,7 +32,7 @@ export class Db<T> {
     let stored = localStorage.getItem(this.key);
     if (stored == undefined) {
       this.markFresh();
-      stored = JSON.stringify((this.value = this.start), this.replacer);
+      stored = JSON.stringify((this.value = this.start));
       this.onUpdate(this.value);
       localStorage.setItem(this.key, stored);
       return this.value;
@@ -49,13 +46,13 @@ export class Db<T> {
   set(value: T): void {
     this.markFresh();
     this.onUpdate((this.value = value));
-    localStorage.setItem(this.key, (this.json = JSON.stringify(value, this.replacer)));
+    localStorage.setItem(this.key, (this.json = JSON.stringify(value)));
   }
 
   update(fn: (value: T) => T): void {
     if (this.fresh) return this.set(fn(this.value!));
     let stored = localStorage.getItem(this.key);
-    if (stored == undefined) stored = JSON.stringify((this.value = this.start), this.replacer);
+    if (stored == undefined) stored = JSON.stringify((this.value = this.start));
     const value = this.json === stored ? this.value! :
       v.parse(this.schema, JSON.parse(stored));
     this.set(fn(value));
