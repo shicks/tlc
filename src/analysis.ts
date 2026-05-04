@@ -151,7 +151,7 @@ class CompletedActivities {
   extraHtt = 0;
   homeFree = true;
 
-  constructor(readonly year: number, activities: ConcreteActivity[] = []) {
+  constructor(readonly year: number, readonly activities: ConcreteActivity[] = []) {
     for (const a of activities) {
       this.add(a);
     }
