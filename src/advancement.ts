@@ -1,10 +1,11 @@
 // Tools for dealing with advancement UI.
 
-import { ActivityId, Branch, BranchData, ConcreteActivity, getOrScrapeBranchData, selectedBranchName } from './branch';
+import { Activity, ActivityId, ActivityType, AllBranchData, Branch, BranchData, ConcreteActivity } from './branch';
 import { Db } from './db';
 import { getTrailmanById, getTrailmen, Trailman, TrailmanId } from './trailman';
 import { assertType, exists, isLastYear, parseDate, waitFor } from './util';
 import * as ui from './ui';
+import { Dialog } from './ui';
 import * as v from 'valibot';
 import { addDocumentChangeListener, handleDocumentChangeImmediately } from './observer';
 
@@ -127,7 +128,7 @@ export function selectTrailmen(names: string[], quiet = false): number {
   const messages = [];
   if (missing.length) messages.push(`Missing trailmen from select:\n  ${missing.join('\n  ')}`);
   if (unknown.length) messages.push(`Unknown trailmen, please rescrape:\n  ${unknown.join('\n  ')}`);
-  if (!quiet && messages.length) ui.Dialog.textarea(messages.join('\n\n'));
+  if (!quiet && messages.length) Dialog.textarea(messages.join('\n\n'));
   return ids.length;
 };
 
@@ -145,6 +146,87 @@ export function selectBranch(branch: string): boolean {
   $('#badge-select').val(id).trigger('change');
   return true;
 };
+
+
+const db = new Db<AllBranchData>(
+  '__sdh__all_branch_data',
+  AllBranchData,
+  {},
+);
+export function getBranchData(b: Branch): BranchData {
+  const result = db.get()[b];
+  if (result == undefined) throw new Error(`Missing branch data for ${b}`);
+  return result;
+}
+export function getOrScrapeBranchData(b: Branch): BranchData {
+  try {
+    return getBranchData(b);
+  } catch {
+    if (b === selectedBranchName()) return scrapeBranch();
+    throw new Error(`Branch ${b} not selected`);
+  }
+}
+
+export function selectedBranchName(): string|undefined {
+  const branchId = $('#badge-select').val();
+  return [...$(`#badge-select option[value="${branchId}"]`)][0]
+    ?.textContent?.split('|')?.[0];
+}
+
+/** Scrapes the current advancement page to find metadata about a branch. */
+export function scrapeBranch(): BranchData {
+  const branch = selectedBranchName();
+  if (!v.is(Branch, branch)) return {branch: '', activities: {}, needCoreSteps: 0, needElectives: 0};
+  // Scrape the list of activities
+  const activities: Record<string, Activity> = {};
+  let type: ActivityType|undefined;
+  const foundTypes = new Set<ActivityType>();
+  for (const row of $('tbody#table_items > tr')) {
+    assertType<HTMLElement>(row);
+    const name = row?.firstChild?.firstChild?.textContent?.trim();
+    if (!name) continue;
+    if (name === 'Core Steps') {
+      type = 'core';
+    } else if (name === 'Elective Steps') {
+      type = 'elective';
+    } else if (name === 'Hit The Trail Activities') {
+      type = 'htt';
+    } else if (name === 'Family Home Activities') {
+      type = 'home';
+    } else if (row.classList.contains('row-highlight')) {
+      if (!type) throw new Error(`Activity without type`);
+      foundTypes.add(type);
+      const id = row.querySelector('.advance-icon')!.id.split('_')[0]!;
+      activities[id] = {branch, name, type, id};
+    }
+  }
+  if (foundTypes.size !== 4) {
+    throw new Error(`Missing activity type: found ${[...foundTypes].join(', ')}`);
+  }
+  // Scrape the requirements grid
+  const needGrid = querySingleton('.simple_grid_box_advancement.text-left');
+  if (needGrid.textContent !== 'Branch\u00a0Pin') {
+    throw new Error(`Unexpected element: ${needGrid.textContent}`);
+  }
+  const needCoreSteps = Number(needGrid.nextElementSibling?.textContent);
+  const needElectives = Number(needGrid.nextElementSibling?.nextElementSibling?.textContent);
+  if (isNaN(needCoreSteps) || isNaN(needElectives)) {
+    throw new Error(`Could not scrape requirements grid`);
+  }
+  const result = {needCoreSteps, needElectives, activities};
+  db.update(infos => ({...infos, [branch]: result}));
+  return result;
+}
+addDocumentChangeListener('/advancement/index', scrapeBranch);
+
+function querySingleton(query: string): HTMLElement {
+  const [e, ...rest] = document.querySelectorAll(query);
+  if (!e) throw new Error(`Missing element: ${query}`);
+  if (rest.length) throw new Error(`Non-unique element: ${query}`);
+  return e as HTMLElement;
+}
+(window as any).selectedBranchName = selectedBranchName;
+
 
 // NOTE: THIS IS FOR STANDARD VIEW
 // /** Selects trailmen and waits for the page to redraw. */
