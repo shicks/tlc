@@ -405,7 +405,7 @@ function parseCalendar(s: string): Calendar {
 }
 
 export async function analyzeProgress() {
-  //const db = await MessageStore.open();
+  //const db = await MessageStore.open(); const {} = {db}; // TODO - unused
   // Compute Forest Award status
   const badge = new Map<TrailmanId, string>();
   for (const patrol of ['Fox', 'Hawk', 'Mountain Lion']) {
