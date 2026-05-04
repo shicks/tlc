@@ -43,8 +43,7 @@ import * as v from 'valibot';
 import PlainDate = Temporal.PlainDate;
 
 const ActivityName = v.string();
-const Date = v.pipe(v.string(), v.transform(parseDate));
-const Dates = v.pipe(v.array(Date), v.readonly());
+const Dates = v.pipe(v.array(parseDate.T), v.readonly());
 const BranchCalendar = v.pipe(v.record(ActivityName, Dates), v.readonly());
 type BranchCalendar = v.InferOutput<typeof BranchCalendar>;
 const Calendar = v.pipe(v.record(Branch, BranchCalendar), v.readonly())

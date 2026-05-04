@@ -1,7 +1,7 @@
 // Schema for branch metadata
 
 import * as v from 'valibot';
-import { assertType } from './util';
+import { assertType, parseDate } from './util';
 import { Db } from './db';
 import { addDocumentChangeListener } from './observer';
 
@@ -80,7 +80,7 @@ export function getOrScrapeBranchData(b: Branch): BranchData {
 export const ConcreteActivity = v.object({
   name: v.string(), // NOTE: may include "1 of 2" or "Year 1"
   type: ActivityType,
-  date: v.instance(Temporal.PlainDate),
+  date: parseDate.T,
   note: v.string(),
   // year: v.optional(v.number()),
   // index: v.optional(v.number()),

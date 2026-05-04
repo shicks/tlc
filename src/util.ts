@@ -1,3 +1,5 @@
+import * as v from 'valibot';
+
 /**
  * Initiates a download in the browser.
  */
@@ -33,6 +35,7 @@ export function isThisYear(t: Temporal.PlainDate): boolean {
   return !isBefore(t, july15);
 }
 
+// Supports formats: mm/dd/yy, mm/dd/yyyy, yyyy-mm-dd
 export function parseDate(s: string): Temporal.PlainDate {
   const match = /^(\d\d?)\/(\d\d?)\/(\d\d(?:\d\d)?)$/.exec(s);
   if (!match) {
@@ -47,6 +50,10 @@ export function parseDate(s: string): Temporal.PlainDate {
   const day = Number(dayStr);
   const year = Number(yearStr!.length < 4 ? '20' + yearStr : yearStr);
   return Temporal.PlainDate.from({month, day, year});
+}
+// parseDate.T is a valibot parser w/ input string, output PlainDate
+export namespace parseDate {
+  export const T = v.pipe(v.string(), v.transform(parseDate));
 }
 
 export function toSlash(d: Temporal.PlainDate): string {
