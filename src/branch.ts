@@ -3,7 +3,6 @@
 import * as v from 'valibot';
 import { assertType } from './util';
 import { Db } from './db';
-import { Dialog } from './ui';
 import { addDocumentChangeListener } from './observer';
 
 export const HERITAGE = 'Heritage Branch';
@@ -27,6 +26,8 @@ export type ActivityType = v.InferOutput<typeof ActivityType>;
 
 export const Activity = v.pipe(v.object({
   name: v.string(),
+  branch: Branch,
+  //date: v.optional(PlainDate),  // TODO - future, track scheduled events
   id: ActivityId,
   type: ActivityType,
 }), v.readonly());
@@ -95,6 +96,7 @@ export function selectedBranchName(): string|undefined {
 /** Scrapes the current advancement page to find metadata about a branch. */
 export function scrapeBranch(): BranchData {
   const branch = selectedBranchName();
+  if (!v.is(Branch, branch)) return {activities: {}, needCoreSteps: 0, needElectives: 0};
   // Scrape the list of activities
   const activities: Record<string, Activity> = {};
   let type: ActivityType|undefined;
@@ -115,7 +117,7 @@ export function scrapeBranch(): BranchData {
       if (!type) throw new Error(`Activity without type`);
       foundTypes.add(type);
       const id = row.querySelector('.advance-icon')!.id.split('_')[0]!;
-      activities[id] = {name, type, id};
+      activities[id] = {branch, name, type, id};
     }
   }
   if (foundTypes.size !== 4) {
@@ -132,11 +134,7 @@ export function scrapeBranch(): BranchData {
     throw new Error(`Could not scrape requirements grid`);
   }
   const result = {needCoreSteps, needElectives, activities};
-  if (v.is(Branch, branch)) {
-    db.update(infos => ({...infos, [branch]: result}));
-  } else {
-    Dialog.info(`Not a valid branch: ${branch}`);
-  }
+  db.update(infos => ({...infos, [branch]: result}));
   return result;
 }
 addDocumentChangeListener('/advancement/index', scrapeBranch);

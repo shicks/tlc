@@ -117,3 +117,49 @@ export function timeout(duration: Temporal.Duration, {signal}: {signal?: AbortSi
     signal?.addEventListener('abort', abort, {once: true});
   });
 }
+
+export class DefaultMap<K, V> extends Map<K, V> {
+  constructor(private readonly factory: (key: K) => V) {
+    super();
+  }
+  override get(key: K): V {
+    if (!this.has(key)) {
+      const val = this.factory(key);
+      this.set(key, val);
+    }
+    return super.get(key)!;
+  }
+}
+
+export class Multiset<K> {
+  private readonly data = new DefaultMap<K, number>(() => 0);
+  private _size = 0;
+  has(key: K): boolean {
+    return this.data.get(key) > 0;
+  }
+  count(key: K): number {
+    return this.data.get(key);
+  }
+  add(key: K, count = 1) {
+    this.data.set(key, this.data.get(key) + count);
+    this._size += count;
+  }
+  remove(key: K): boolean {
+    const val = this.data.get(key);
+    const newVal = Math.max(0, val - 1);
+    if (newVal > 0) {
+      this.data.set(key, newVal);
+    } else {
+      this.data.delete(key);
+    }
+    if (val > 0) {
+      this._size--;
+      return true;
+    } else {
+      return false;
+    }
+  }
+  get size(): number {
+    return this._size;
+  }
+}

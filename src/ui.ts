@@ -124,6 +124,49 @@ export class Dialog<T> {
     });
   }
 
+  static html(
+    html: string,
+    buttons: Record<string, (value: string) => string> = {},
+  ): Dialog<void> {
+    const e = document.createElement('div');
+    e.innerHTML = html;
+    Object.assign(e.style, {
+      width: '800px',
+      height: '600px',
+      overflowX: 'auto',
+      overflowY: 'auto',
+    });
+    return new Dialog<void>({
+      contents: [e],
+      buttons: {
+        ...Object.fromEntries(Object.entries(buttons).map(([label, action]) => {
+          return [label, () => e.innerHTML = action(e.innerHTML)];
+        })),
+        Copy: async () => {
+          // 1. Prepare the data types
+          const htmlContent = e.innerHTML;
+          const plainText = e.innerText;
+          // 2. Create Blobs for both HTML and Plain Text
+          const htmlBlob = new Blob([htmlContent], { type: "text/html" });
+          const textBlob = new Blob([plainText], { type: "text/plain" });
+          try {
+            // 3. Write to the clipboard
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                "text/html": htmlBlob,
+                "text/plain": textBlob,
+              })
+            ]);
+          } catch (err) {
+            console.error("Failed to copy: ", err);
+          }
+        },
+        OK: RESOLVE,
+      },
+      keys: {Escape: RESOLVE},
+    });
+  }
+
   static editableTextarea(
     text: string,
     buttons: Record<string, (value: string) => string> = {},
