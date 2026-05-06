@@ -598,8 +598,10 @@ export async function analyzeProgress() {
   const reports: string[] = [];
 
   for (const patrol of getSubpatrols()) {
+    const trailmen = getTrailmenBySubpatrol(patrol)!.filter(t => progressMap.has(t.id));
+    if (!trailmen.length) continue;
     reports.push(`<h1>${patrol}</h1>`);
-    for (const trailman of getTrailmenBySubpatrol(patrol)!) {
+    for (const trailman of trailmen) {
       const subject = `Progress report for ${trailman.lastName}, ${trailman.firstName} (${patrol})${
                        badge.get(trailman.id) === 'forest' ? ' 🌲' : ''}`; // last year forest
       reports.push(
