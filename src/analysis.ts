@@ -403,23 +403,73 @@ function parseCalendar(s: string): Calendar {
   return calendar;
 }
 
+// Shows emoji
+class ProgressBar {
+  parts: string[][] = [];
+  private _length = 0;
+  constructor(readonly type: ActivityType, readonly count: number, mult: number) {
+    this.parts = Array.from({length: mult}, () => []);
+  }
+  addHome(which = 0) {
+    const part = this.parts[Math.min(which, this.parts.length - 1)]!;
+    if (part.length < this.count) {
+      part.push(GOT_ICONS.home);
+      this._length++;
+      return;
+    }
+    for (const p of this.parts) {
+      if (p.length < this.count) {
+        p.push(GOT_ICONS.home);
+        this._length++;
+        return;
+      }
+    }
+  }
+  push(s: string) {
+    for (const part of this.parts) {
+      if (part.length < this.count) {
+        part.push(s);
+        this._length++;
+        return;
+      }
+    }
+  }
+  fillMissing() {
+    for (const part of this.parts) {
+      while (part.length < this.count) {
+        part.push(MISSED_ICONS[this.type]);
+        this._length++;
+      }
+    }
+  }
+  done(): boolean {
+    return this._length === this.count * this.parts.length;
+  }
+  toString(): string {
+    return this.parts.map(ss => ss.join('')).join('<br>');
+  }
+  get length(): number {
+    return this._length;
+  }
+}
+
 const GOT_ICONS: Record<ActivityType, string> = {
-  core: '🟢',
-  elective: '🟩',
-  htt: '🏕️',
+  core: '✅️', // 🟢',  // ✅
+  elective: '✅️', // 🟩',
+  htt: '✅️', // 🚶', // 🏕️',
   home: '🏠',
 };
 const MISSED_ICONS: Record<ActivityType, string> = {
-  core: '⛔',
+  core: '❌', // ⛔',
   elective: '❌',
-  htt: '🚫',
+  htt: '❌', // 🚷', // 🚫',
   home: '❓',
 };
 class BranchProgress {
-  core: string[] = [];
-  elective: string[] = [];
-  htt: string[] = [];
-  home: boolean[] = []; // false = last year, true = this year
+  core: ProgressBar;
+  elective: ProgressBar;
+  htt: ProgressBar;
+  home: number[] = []; // 0 = last year, 1 = this year
   freeHome = true;
   priority: number; // for allocating extra HTT (1 for HTT, 4 for CSE, 8 for impossible)
   needCore: number;
@@ -430,40 +480,38 @@ class BranchProgress {
     readonly mult: number,
     activities: ConcreteActivity[],
   ) {
+    this.core = new ProgressBar('core', data.needCoreSteps, mult);
+    this.elective = new ProgressBar('elective', data.needElectives, mult);
+    this.htt = new ProgressBar('htt', 1, mult);
     for (const a of activities) {
       if (a.type === 'home') {
         const thisYear = isThisYear(a.date);
-        this.home.push(thisYear);
+        this.home.push(thisYear ? 1 : 0);
         if (thisYear) this.freeHome = false;
       } else {
         this[a.type].push(GOT_ICONS[a.type]);
       }
     }
-    // Allocate home activities
-
-    function addHome(a: string[], b: boolean) {
-      if (b) {
-        a.push(GOT_ICONS.home);
-      } else {
-        a.unshift(GOT_ICONS.home);
-      }
-    }
+    // Allocate home activities - TODO - clean up counting
     let needCore = this.needCore = mult * this.data.needCoreSteps;
+    needCore -= this.core.length;
     let needElec = this.needElectives = mult * this.data.needElectives;
-    let needHtt = this.htt.length;
+    needElec -= this.elective.length;
+    let needHtt = mult;
+    needHtt -= this.htt.length;
     while (needCore > 0 && this.home.length > 1) {
       this.home.shift();
-      addHome(this.core, this.home.shift()!);
+      this.core.addHome(this.home.shift()!);
       needCore--;
     }
     while (needElec > 0 && this.home.length > 1) {
       this.home.shift();
-      addHome(this.elective, this.home.shift()!);
+      this.elective.addHome(this.home.shift()!);
       needElec--;
     }
     while (needHtt > 0 && this.home.length > 1) {
       this.home.shift();
-      addHome(this.elective, this.home.shift()!);
+      this.htt.addHome(this.home.shift()!);
       needHtt--;
     }
     let priority = 0;
@@ -487,25 +535,22 @@ class BranchProgress {
   // Renders the cells <td>core</td><td>elective</td><td>htt</td>
   render(): string {
     let home = this.freeHome;
-    while (this.core.length < this.needCore) {
+    while (!this.core.done()) {
       this.core.push(home ? MISSED_ICONS.home : MISSED_ICONS.core);
       home = false;
     }
-    while (this.elective.length < this.needElectives) {
+    while (!this.elective.done()) {
       this.elective.push(home ? MISSED_ICONS.home : MISSED_ICONS.elective);
       home = false;
     }
-    while (this.htt.length < this.mult) {
+    while (!this.htt.done()) {
       this.htt.push(home ? MISSED_ICONS.home : MISSED_ICONS.htt);
       home = false;
     }
-    // TODO - we're not quite preserving the length as well as we could...
-    const s = (ss: string[]): string => {
-      if (this.mult < 2) return ss.join('');
-      const split = ss.length >> 1;
-      return `${ss.slice(0, split).join('')}&nbsp;&nbsp;${ss.slice(split).join('')}`;
-    };
-    return `<td>${s(this.core)}</td><td>${s(this.elective)}</td><td>${this.htt.join('')}</td>`;
+    this.core.fillMissing();
+    this.elective.fillMissing();
+    this.htt.fillMissing();
+    return `<td>${this.core}</td><td>${this.elective}</td><td>${this.htt}</td>`;
   }
 
 }
@@ -544,7 +589,8 @@ export async function analyzeProgress() {
   const activityMap = new Map<ActivityId, Activity>();
   const progressMap = new DefaultMap<TrailmanId, Map<ActivityId, ConcreteActivity>>(() => new Map());
   const extraHtt = new DefaultMap<TrailmanId, Branch[]>(() => []);
-  const awardedBranch = new DefaultMap<TrailmanId, Set<Branch>>(() => new Set());
+  const awardedBranch = new DefaultMap<TrailmanId, Map<Branch, PlainDate>>(() => new Map());
+  const awardedStar = new DefaultMap<TrailmanId, Map<Branch, PlainDate>>(() => new Map());
   // const byType: Record<ActivityType, DefaultMap<Branch, Activity[]>> = {
   //   core: new DefaultMap<Branch, Activity[]>(() => []),
   //   elective: new DefaultMap<Branch, Activity[]>(() => []),
@@ -588,9 +634,20 @@ export async function analyzeProgress() {
       assertType<HTMLElement>(e);
       const [which, trailmanId, levelId] = e.id.split(/_/g);
       assertType<TrailmanId>(trailmanId);
-      if (which !== 'awarded-bp') continue;
-      if (!levelId) throw new Error(`Bad id: ${e.id}`); // TODO - validate?
-      awardedBranch.get(trailmanId).add(branch);
+      if (!levelId) continue;
+      if (which === 'awarded-bp') {
+        const text = e.querySelector('.completed_on_date')?.textContent;
+        if (text) { // this can be false if purchased but not yet awarded.
+          const date = parseDate(text);
+          awardedBranch.get(trailmanId).set(branch, date);
+        }
+      } else if (which === 'awarded-ss') {
+        const text = e.querySelector('.completed_on_date')?.textContent;
+        if (text) {
+          const date = parseDate(text);
+          awardedStar.get(trailmanId).set(branch, date);
+        }
+      }
     }
   }
 
@@ -600,20 +657,40 @@ export async function analyzeProgress() {
   for (const patrol of getSubpatrols()) {
     const trailmen = getTrailmenBySubpatrol(patrol)!.filter(t => progressMap.has(t.id));
     if (!trailmen.length) continue;
-    reports.push(`<h1>${patrol}</h1>`);
+    const key = [
+      //`<h3>Key</h3><ul style="font-size:83%">`,
+      '<br>🪾 = already-received branch pin',
+      '<br>🌿 = newly earned branch pin',
+      '<br>⭐ = already-received sylvan star',
+      '<br>🌟 = newly earned sylvan star',
+      '<br>✅ = completed activity',
+      '<br>❌ = not completed activity',
+      '<br>🏠 = family-home activity substitution',
+      '<br>❓ = eligible to be filled by family-home activity',
+      '<br>🔀 = HTT filled with an extra from a different branch',
+      '<br>🌲 = forest award',
+      //'</ul>',
+    ].join('\n');
+    // reports.push(
+    //   `<h1>${patrol}</h1>`,
+    // )
     for (const trailman of trailmen) {
-      const subject = `Progress report for ${trailman.lastName}, ${trailman.firstName} (${patrol})${
-                       badge.get(trailman.id) === 'forest' ? ' 🌲' : ''}`; // last year forest
+      //const subject = `Progress report for ${trailman.lastName}, ${trailman.firstName} (${patrol})${
+      const hasForest = badge.get(trailman.id) === 'forest';
+      const subject = `${trailman.lastName}, ${trailman.firstName} ${
+                       hasForest ? ' 🌲' : ''}`; // last year foresta
       reports.push(
-        `<h2>${subject}</h2>`,
+        reports.length ? '<br style="page-break-after:always;border:0">' : '',
+        '<div style="page-break-inside:avoid">',
+        `<h2 style="page-break-after:avoid">${subject /*&& '&nbsp;'*/}</h2>`,
 //         `<p>Please see below for a progress report on Woodlands Branch activities.
 // You can view more details on Trail Life Connect.  See <a href="https://www.traillifeconnect.com/getdoc/docntsarqqlm">this tutorial</a> for a walkthrough of how to use it, or feel free to reach out to me if you have any questions!</p>`,
-        '<table><thead>',
-        '<tr><th>Branch</th><th>Core Steps</th><th>Electives</th><th>HTT</th><th>Awards</th></tr>',
+        '<table border="1" style="padding:2px;font-size:83%"><thead>',
+        `<tr><th>Branch</th><th>Core Steps</th><th>Electives</th><th>HTT</th><th>Awards</th></tr>`,
         '</thead><tbody>',
       );
 
-      //🌲🟢⛔🟩❌🏕️🔀🚫🏠❓🌿⭐
+      //🌲🟢⛔🟩❌🏕️🔀🚫🏠❓🪾🌿⭐
 
       // Iterate over branches, find missing HTTs
       // Figure out which branches might get 1 or 2 full sets
@@ -652,16 +729,32 @@ export async function analyzeProgress() {
       }
       // All extra HTT filled in, if we still need 2 things, then it's 8
       for (const p of [...bp1.values(), ...bp2.values()]) {
-        if ((p.priority | 2) || (p.priority | 5) === 5) p.priority = 8;
+        if ((p.priority & 2) === 2 || (p.priority & 5) === 5) p.priority = 8;
       }
       // Extra HTTs are filled in.
+      let branches = 0;
       for (const b of BRANCHES) {
-        const hasBranch = awardedBranch.get(trailman.id).has(b);
-        const progress = (trailman.year === 2 && hasBranch ? bp2 : bp1).get(b)!;
-        reports.push(`<tr><td>${b}${hasBranch ? '🌿' : ''}</td>${progress.render()}<td>${
-                      progress.priority === 0 ? ['', '🌿', '⭐'][progress.mult] : ''}</td></tr>`);
+        const branchDate = awardedBranch.get(trailman.id).get(b);
+        const hasBranch = hasForest || (branchDate && isLastYear(branchDate));
+        const newBranch = branchDate ? '🪾' : '🌿';
+        const newStar = awardedStar.get(trailman.id).has(b) ? '⭐' : '🌟';
+        const earnStar = bp2.get(b)!.priority != 8;
+        let progress = (trailman.year === 2 && hasBranch ? bp2 : bp1).get(b)!;
+        let award = progress.priority === 0 ? ['', newBranch, newStar][progress.mult] : '';
+        if (hasBranch || progress.priority === 0) branches++;
+        if (trailman.year === 2 && !hasBranch && earnStar) { // special case: got both branch AND star same time.
+          progress = bp2.get(b)!;
+          if (progress.priority === 0) award += newStar;
+        }
+        if (branches === 7 && !hasForest) award += '🌲';
+        if (!award && progress.priority < 8) award = MISSED_ICONS.home;
+        reports.push(`<tr><td>${b.replace(' Branch', '')}${hasBranch ? '🪾' : ''}</td>${progress.render()}<td>${award}</td></tr>`);
       }
-      reports.push('</tbody></table>');
+      reports.push(
+        '</tbody></table>',
+        key,
+        '</div>',
+      );
     }
   }
   Dialog.html(reports.join('\n'));
