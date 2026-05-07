@@ -474,6 +474,7 @@ class BranchProgress {
   priority: number; // for allocating extra HTT (1 for HTT, 4 for CSE, 8 for impossible)
   needCore: number;
   needElectives: number;
+  usedExtra = false;
   constructor(
     readonly branch: Branch,
     readonly data: BranchData,
@@ -529,6 +530,7 @@ class BranchProgress {
     if ((this.priority & 3) && extras.length > 0) {
       extras.pop();
       this.htt.push('🔀');
+      this.usedExtra = true;
       this.priority--;
     }
   }
@@ -558,6 +560,8 @@ class BranchProgress {
 type BadgeStatus = 'joining' | 'forest' | 'forest (this year)';
 export async function analyzeProgress() {
   // Compute Forest Award status (this is a little messy)
+  const extraLog = new Map<TrailmanId, {used: Branch[], from: Branch[]}>();
+
   const badge = new Map<TrailmanId, BadgeStatus>();
   for (const patrol of ['Fox', 'Hawk', 'Mountain Lion']) {
     await switchBranch(`${patrol} Branch Patch (Joining Award)` as Branch);
@@ -589,6 +593,7 @@ export async function analyzeProgress() {
   const activityMap = new Map<ActivityId, Activity>();
   const progressMap = new DefaultMap<TrailmanId, Map<ActivityId, ConcreteActivity>>(() => new Map());
   const extraHtt = new DefaultMap<TrailmanId, Branch[]>(() => []);
+  const allExtraHtt = new DefaultMap<TrailmanId, Branch[]>(() => []);
   const awardedBranch = new DefaultMap<TrailmanId, Map<Branch, PlainDate>>(() => new Map());
   const awardedStar = new DefaultMap<TrailmanId, Map<Branch, PlainDate>>(() => new Map());
   // const byType: Record<ActivityType, DefaultMap<Branch, Activity[]>> = {
@@ -627,6 +632,7 @@ export async function analyzeProgress() {
       const date = parseDate(dateElem.textContent);
       if (type === 'htt' && note.includes('\nEXTRA:')) {
         extraHtt.get(trailmanId).push(branch);
+        allExtraHtt.get(trailmanId).push(branch);
       }
       progressMap.get(trailmanId).set(activityId, {name, type, date, note});
     }
@@ -733,6 +739,7 @@ export async function analyzeProgress() {
       }
       // Extra HTTs are filled in.
       let branches = 0;
+      let usedExtra = [];
       for (const b of BRANCHES) {
         const branchDate = awardedBranch.get(trailman.id).get(b);
         const hasBranch = hasForest || (branchDate && isLastYear(branchDate));
@@ -749,6 +756,10 @@ export async function analyzeProgress() {
         if (branches === 7 && !hasForest) award += '🌲';
         if (!award && progress.priority < 8) award = MISSED_ICONS.home;
         reports.push(`<tr><td>${b.replace(' Branch', '')}${hasBranch ? '🪾' : ''}</td>${progress.render()}<td>${award}</td></tr>`);
+        if (progress.usedExtra) usedExtra.push(b);
+      }
+      if (usedExtra.length) {
+        extraLog.set(trailman.id, {used: usedExtra as any, from: allExtraHtt.get(trailman.id)});
       }
       reports.push(
         '</tbody></table>',
@@ -757,7 +768,10 @@ export async function analyzeProgress() {
       );
     }
   }
-  Dialog.html(reports.join('\n'));
+  Dialog.html(reports.join('\n') + '<hr>' + [...extraLog].map(([tid, {used, from}]) => {
+    const t = getTrailmanById(tid)!;
+    return `${t.lastName}, ${t.firstName} (${t.subpatrol}): ${from.join(', ')} => ${used.join(', ')}`;
+  }).join('<br>'));
 }
 
 export async function exportAttendance() {
