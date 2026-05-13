@@ -206,8 +206,17 @@ function confirmMatchingDialog(message: string): PromiseLike<boolean> {
 }
 
 async function uncheckAll() {
+  // If "lock completed" is checked, give an error.
+  if ($('#lock-checked').val() === '1') throw new Error('Please unlock completed');
   const row = await pickRow();
-  const label = row.firstElementChild!.firstChild!;
+  // Now do the work.
+  const textField = $('textarea#comment-specified');
+  const dateField = $('input#date-specified');
+  const origText = textField.val() as string || '';
+  const origDate = dateField.val();
+  let needsRestore = false;
+  const label = row.firstElementChild!.firstChild!.textContent!;
+  const htt = label.includes('Hit the Trail!');
   const prompt = `Uncheck all "${label}"?`;
   // TODO - show all the names, dates, and comments?
   const matchingOnly = await (origText ?
@@ -218,18 +227,69 @@ async function uncheckAll() {
     const el = () => div.firstElementChild as HTMLElement;
     const thisText = (el().dataset.originalTitle || '').replace(/[^<]*<br ?\/?>/, '');
     if (matchingOnly && !thisText.includes(origText)) continue;
+    if (matchingOnly && htt && thisText.includes('EXTRA:')) {
+      // Don't unclick - instead, edit the comment
+      const date = (el().nextElementSibling || div.nextElementSibling)!.textContent;
+      $('input#date-specified').val(date).trigger('change');
+      $('textarea#comment-specified').val(
+        thisText.split(/\nEXTRA:\s*/g)
+          .filter(t => !t.includes(origText))
+          .join('\nEXTRA: ')).trigger('change');
+      needsRestore = true;
+      el().click();
+      await waitFor(() => el().classList.contains('fa-times-circle'));
+      el().click();
+      await waitFor(() => el().classList.contains('fa-check'));
+      continue;
+    }
     el().click();
     await waitFor(() => el().classList.contains('fa-times-circle'));
+  }
+  if (needsRestore) {
+    textField.val(origText).trigger('change');
+    dateField.val(origDate!).trigger('change');
   }
 }
 
 async function checkAll() {
   const row = await pickRow();
-  const label = row.firstElementChild!.firstChild!;
-  // TODO - show all the names, dates, and comments?
-  await ui.Dialog.confirm(`Check all "${label.textContent}"?`);
-  for (const i of row.querySelectorAll('.advance-icon[data-value="0"] i')) {
-    (i as HTMLElement).click();
+  const locked = $('#lock-checked').val() === '1';
+  function toggleLocked() {
+    (document.getElementById('lock-checked')
+      ?.previousElementSibling as HTMLElement).click();
+  }
+
+  // Now do the work.
+  const textField = $('textarea#comment-specified');
+  const dateField = $('input#date-specified');
+  const origText = textField.val() as string || '';
+  const origDate = dateField.val() as string || '';
+
+  const label = row.firstElementChild!.firstChild!.textContent!;
+  const htt = label.includes('Hit the Trail!');
+  await ui.Dialog.confirm(`Check all "${label}"?`);
+
+  for (const i of row.querySelectorAll('.advance-icon i')) {
+    const div = i.parentElement!;
+    const isChecked = div.dataset.value === '1';
+    const el = () => div.firstElementChild as HTMLElement;
+    const thisText = (el().dataset.originalTitle || '').replace(/[^<]*<br ?\/?>/, '');
+    if (isChecked) {
+      if (!htt) continue;
+      const date = (el().nextElementSibling || div.nextElementSibling)!.textContent;
+      textField.val(`${thisText}\nEXTRA: ${origText}`);
+      dateField.val(date);
+      if (locked) toggleLocked();
+      el().click();
+      await waitFor(() => el().classList.contains('fa-times-circle'));
+      el().click();
+      await waitFor(() => el().classList.contains('fa-times-circle'));
+      if (locked) toggleLocked();
+      dateField.val(origDate);
+      textField.val(origText);
+      continue;
+    }
+    el().click();
   }
 }
 
