@@ -213,10 +213,10 @@ async function pickEventDetails() {
     setDetailsFromEvent(event);
 }
 function setDetailsFromEvent(event: HTMLElement) {
-    const [, comment] = event.querySelector('i')!.dataset['originalTitle']!.split('<br>');
+    const [, comment] = event.querySelector('i')!.dataset['originalTitle']!.split(/<br ?\/?>/);
     const date = event.querySelector('.completed_on_date')!.textContent;
-    $('input#date-specified').val(date);
-    $('textarea#comment-specified').val(comment || '');
+    $('input#date-specified').val(date).trigger('change');
+    $('textarea#comment-specified').val(comment || '').trigger('change');
 }
 
 function splitDates() {
