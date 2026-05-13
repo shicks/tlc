@@ -878,6 +878,45 @@ export async function exportAttendance() {
   }
 }
 
+// Export a sorted list of attendance dates for each trailman
+export async function exportAttendanceDates() {
+  const intern = (() => {
+    const map = new Map<string, PlainDate>();
+    return (p: PlainDate): PlainDate => {
+      const s = String(p);
+      return map.get(s) ?? (map.set(s, p), p);
+    };
+  })();
+  const reports = new Map<TrailmanId, Set<PlainDate>>(
+    getTrailmen().map(t => [t.id, new Set()]),
+  );
+  for (const branch of BRANCHES) {
+    await switchBranch(branch);
+    const branchData = scrapeBranch();
+    for (const [t, activities] of scrapeProgress(branchData)) {
+      const dates = reports.get(t.id)!;
+      for (const a of activities) {
+        if (isThisYear(a.date)) dates.add(intern(a.date));
+      }
+    }
+  }
+
+  const columns = [
+    'Last Name',
+    'First Name',
+    'Patrol',
+    'Dates',
+  ];
+  const data = [columns];
+  for (const [id, dates] of reports) {
+    const t = getTrailmanById(id)!;
+    data.push([t.lastName, t.firstName, t.subpatrol,
+               ...[...dates].sort(PlainDate.compare).reverse().map(String)]);
+  }
+  // Make TSV
+  Dialog.textarea(data.map(row => row.join('\t')).join('\n'));
+}
+
 
 async function scrapeAllBranches() {
   for (const b of BRANCHES) {
@@ -894,6 +933,7 @@ function installUi() {
       'Edit Calendar': editCalendar,
       'Analyze Progress': analyzeProgress,
       'Export Attendance': exportAttendance,
+      'Export Dates': exportAttendanceDates,
     },
   });
 }
