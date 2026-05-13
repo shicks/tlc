@@ -131,6 +131,9 @@ export function selectTrailmen(names: string[], quiet = false): number {
   return ids.length;
 };
 
+// TODO - this should help fix the url, but it also forces a reload...
+// $($0).on('change', ((e) => () => window.location.search = window.location.search.replace(/&user_id=[^&]*/, '') + '&user_id=' + $(e).val().join(','))($0))
+
 /** Selects the given branch.  Returns true if successful. */
 export function selectBranch(branch: string): boolean {
   const id = [...$('#badge-select option')].flatMap(o =>
