@@ -191,13 +191,35 @@ function pickRow(): Promise<HTMLElement> {
   return ui.pickElement('#award_html tr.row-highlight', 'filterable row');
 }
 
+function confirmMatchingDialog(message: string): PromiseLike<boolean> {
+  const p = document.createElement('p');
+  p.textContent = message;
+  return new ui.Dialog<boolean>({
+    contents: [p],
+    buttons: {
+      Cancel: ui.CANCEL,
+      Matching: ui.resolveWith(true),
+      OK: ui.resolveWith(false),
+    },
+    keys: {Escape: ui.CANCEL},
+  });
+}
+
 async function uncheckAll() {
   const row = await pickRow();
   const label = row.firstElementChild!.firstChild!;
+  const prompt = `Uncheck all "${label}"?`;
   // TODO - show all the names, dates, and comments?
-  await ui.Dialog.confirm(`Uncheck all "${label.textContent}"?`);
+  const matchingOnly = await (origText ?
+    confirmMatchingDialog(prompt) : ui.Dialog.confirm(prompt).then(() => false));
   for (const i of row.querySelectorAll('.advance-icon[data-value="1"] i')) {
-    (i as HTMLElement).click();
+    const div = i.parentElement!;
+    // NOTE: click replaces <i> element
+    const el = () => div.firstElementChild as HTMLElement;
+    const thisText = (el().dataset.originalTitle || '').replace(/[^<]*<br ?\/?>/, '');
+    if (matchingOnly && !thisText.includes(origText)) continue;
+    el().click();
+    await waitFor(() => el().classList.contains('fa-times-circle'));
   }
 }
 

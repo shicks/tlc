@@ -10,8 +10,11 @@ export interface DialogOpts<T> {
   keys?: Record<string, ButtonFn<T>>;
 }
 
-const RESOLVE: ButtonFn<void> = (resolve) => resolve();
-const CANCEL: ButtonFn<any> = (_resolve, reject) => reject(new Error('Cancalled'));
+export const RESOLVE: ButtonFn<void> = (resolve) => resolve();
+export function resolveWith<T>(arg: T): ButtonFn<T> {
+  return (resolve) => resolve(arg);
+}
+export const CANCEL: ButtonFn<any> = (_resolve, reject) => reject(new Error('Cancalled'));
 
 export class Dialog<T> {
   private readonly reject: (err: Error) => void;
