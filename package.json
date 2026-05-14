@@ -24,6 +24,7 @@
     "@typescript/native-preview": "^7.0.0-dev.20260313.1",
     "esbuild": "^0.27.3",
     "fuzzball": "^2.2.3",
+    "idb": "^8.0.3",
     "papaparse": "^5.5.3",
     "typescript": "^6.0.1-rc",
     "valibot": "^1.2.0"
