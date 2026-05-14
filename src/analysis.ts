@@ -1,6 +1,6 @@
 // Analysis of advancement grid to figure out what everybody needs.
 
-import { scrapeProgress, switchBranch } from './advancement';
+import { scrapeProgress, selectTrailmen, switchBranch } from './advancement';
 import {
   Activity,
   ActivityId,
@@ -21,6 +21,9 @@ import {
 } from './branch';
 import { Db } from './db';
 import {
+  PATROLS,
+  Patrol,
+  Trailman,
   TrailmanId,
   getSubpatrols,
   getTrailmanById,
@@ -37,7 +40,7 @@ import {
   toSlash,
   today,
 } from './util';
-import { Dialog, addButtonsToTop } from './ui';
+import { Dialog, addButtonsAfter, addButtonsToTop } from './ui';
 import * as v from 'valibot';
 
 import PlainDate = Temporal.PlainDate;
@@ -774,6 +777,58 @@ export async function analyzeProgress() {
   }).join('<br>'));
 }
 
+
+export async function computeForestAwards() {
+  const branchCount = new Map<TrailmanId, {trailman: Trailman, count: number}>(
+    getTrailmen().map(t => [t.id, {trailman: t, count: 0}]));
+  // Iterate over the branches
+  for (const branch of BRANCHES) {
+    await switchBranch(branch);
+    for (const e of document.querySelectorAll('.bp_ss[data-value="1"]')) {
+      assertType<HTMLElement>(e);
+      const [bpStr, trailmanId, levelId] = e.id.split(/_/g);
+      if (bpStr !== 'bp') continue;
+      assertType<TrailmanId>(trailmanId);
+      if (!levelId) throw new Error(`Bad id: ${e.id}`); // TODO - validate?
+      branchCount.get(trailmanId)!.count++;
+    }
+  }
+
+  const byPatrol = new Map<Patrol, Trailman[]>(PATROLS.map(p => [p, []]));
+  for (const {trailman, count} of branchCount.values()) {
+    if (count < 7) continue;
+    byPatrol.get(trailman.patrol)!.push(trailman);
+  }
+
+  const buttons: Record<string, () => void> = {};
+  for (const [patrol, trailmen] of byPatrol) {
+    buttons[`${patrol} Forest`] = () => selectTrailmen(trailmen.map(t => `${t.lastName}, ${t.firstName}`));
+  }
+
+  addButtonsAfter(/^Select Trailmen:/, buttons);
+}
+
+// // E.g. forest award status
+
+
+//   for (const [patrol, trailmen] of byPatrol) {
+//     // await switchBranch(`${patrol} Branch Patch (Joining Award)` as Branch);
+//     // for (const e of $('#table_items > tr.row-highlight + tr:not(.row-highlight) > td > div')) {
+//     //   const trailmanId = e.id.split(/_/g)[0]!;
+//     //   if (getTrailmanById(trailmanId)?.patrol !== patrol) continue;
+//     //   if (e.textContent.startsWith('100%')) badge.set(trailmanId, 'joining');
+//     // }
+//     await switchBranch(`${patrol} Forest Award` as Branch);
+//     for (const t of trailmen) {
+//       const e = document.querySelector(`.advance-icon[data-tm="${t.id}"]`);
+//       if (!e) throw new Error(`Missing award icon for ${t.name} (${t.subpatrol})`);
+//       assertType<HTMLElement>(e);
+//       if (e.dataset.value === '1') continue; // already clicked.
+//       e.querySelector('i')!.click();
+//     }
+//   }
+// }
+
 export async function exportAttendance() {
   // TODO - do we care about forest award status? if so, copy?
 
@@ -934,6 +989,7 @@ function installUi() {
       'Analyze Progress': analyzeProgress,
       'Export Attendance': exportAttendance,
       'Export Dates': exportAttendanceDates,
+      'Forest Awards': computeForestAwards,
     },
   });
 }
