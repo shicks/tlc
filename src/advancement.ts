@@ -210,6 +210,8 @@ async function uncheckAll() {
   const label = row.firstElementChild!.firstChild!;
   const prompt = `Uncheck all "${label}"?`;
   // TODO - show all the names, dates, and comments?
+  const textField = $('textarea#comment-specified');
+  const origText = textField.val() as string || '';
   const matchingOnly = await (origText ?
     confirmMatchingDialog(prompt) : ui.Dialog.confirm(prompt).then(() => false));
   for (const i of row.querySelectorAll('.advance-icon[data-value="1"] i')) {
