@@ -2,7 +2,7 @@
 // Specifically, we may want to restrict to exactly this URL:
 //   https://www.traillifeconnect.com/user/index?UserSearch%5Btrailman%5D=1&UserSearch%5Blevel_id%5D=wt&_tog5317d374=all
 
-import { getSubpatrols, getTrailmen, getTrailmenBySubpatrol, Patrol, storeTrailmen, Trailman } from './trailman';
+import { clearTrailmen, getSubpatrols, getTrailmen, getTrailmenBySubpatrol, Patrol, storeTrailmen, Trailman } from './trailman';
 import { assert, assertType, july15, parseDate } from './util';
 import * as ui from './ui';
 import * as v from 'valibot';
@@ -120,6 +120,16 @@ function installUi() {
     Scrape() {
       const updated = scrapeTrailmen();
       ui.Dialog.info(`Updated ${updated} entries`);
+    },
+    async Clear() {
+      try {
+        await ui.Dialog.confirm('Clear cached member list?');
+      } catch {
+        return;
+      }
+      const count = getTrailmen().length;
+      clearTrailmen();
+      ui.Dialog.info(`Cleared ${count} cached member entries`);
     },
   });
 }

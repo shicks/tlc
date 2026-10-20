@@ -52,6 +52,10 @@ export function storeTrailmen(trailmen: Trailman[]): void {
   db.set(trailmen);
 }
 
+export function clearTrailmen(): void {
+  db.set([]);
+}
+
 export function getTrailmen(): Trailman[] {
   return [...db.get()];
 }

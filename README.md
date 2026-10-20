@@ -82,6 +82,7 @@ To understand the logic in this codebase, it helps to understand the terminology
 - Adds top buttons:
   - **Scrape**: Scrapes the member grid (`tr.user_grid`), extracting names, TLC user IDs, assigned patrol, and calculated program year (Year 1 vs Year 2, calculated from birthdates or subpatrol naming conventions).
   - **Show**: Opens a modal displaying all cached troop members grouped by patrol/subpatrol.
+  - **Clear**: Prompts for confirmation and resets the cached troop member database in `localStorage`.
 - Automatically keeps the local trailmen database fresh via a `MutationObserver`.
 
 ### 2. Attendance Importer (`/attendance*`)
