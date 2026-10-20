@@ -255,14 +255,13 @@ npm run watch
 
 ---
 
-## Known Issues & Current Status
+## Current Status
 
-This repository is an active work-in-progress containing a combination of hand-crafted domain logic and experimental code generated during early iterations with Gemini 2.5:
-
-- **Build Export Mismatch**: In recent commits, `getBranchData` and `scrapeBranch` were relocated from `branch.ts` to `advancement.ts`, but `analysis.ts` still imports them from `./branch`.
-- **Missing Variable Reference**: In [src/advancement.ts](file:///l:/home/sdh/src/tlc/src/advancement.ts#L295), the `uncheckAll` function references an undeclared identifier `origText`.
-- **Dead Code in `src/idb.ts`**: An incomplete IndexedDB schema and copypasted draft class exist in `src/idb.ts` but are not yet used by the app.
-- **Detailed Audit**: For an exhaustive technical breakdown of known bugs, dead code, and guidance for AI agents, see [AGENTS.md](file:///l:/home/sdh/src/tlc/AGENTS.md).
+- **Clean Build & Typecheck**: The project compiles with `npm run build` and passes `npx tsc --noEmit` with 0 type errors on `main`.
+- **Known Technical Debt**:
+  - **Dead Code in `src/idb.ts`**: A 32-line IndexedDB skeleton stub exists on `main`. An unfinished IndexedDB migration exists in the separate `idb` branch, but `main` relies on the battle-tested `localStorage` implementation in `src/db.ts`.
+  - **Deactivated Memoization**: `updateMemoizedProgress()` in `src/advancement.ts` is currently disabled pending a clean caching design.
+- **Detailed Audit**: For an exhaustive technical breakdown of architecture, legacy DOM selectors, and guidelines for AI agents, see [AGENTS.md](file:///l:/home/sdh/src/tlc/AGENTS.md).
 
 ---
 

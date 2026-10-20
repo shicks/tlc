@@ -208,10 +208,10 @@ function confirmMatchingDialog(message: string): PromiseLike<boolean> {
 async function uncheckAll() {
   const row = await pickRow();
   const label = row.firstElementChild!.firstChild!;
-  const prompt = `Uncheck all "${label}"?`;
+  const prompt = `Uncheck all "${label.textContent}"?`;
   // TODO - show all the names, dates, and comments?
   const textField = $('textarea#comment-specified');
-  const origText = textField.val() as string || '';
+  const origText = (textField.val() as string || '').trim();
   const matchingOnly = await (origText ?
     confirmMatchingDialog(prompt) : ui.Dialog.confirm(prompt).then(() => false));
   for (const i of row.querySelectorAll('.advance-icon[data-value="1"] i')) {

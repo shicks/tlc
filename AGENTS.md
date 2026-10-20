@@ -195,48 +195,36 @@ graph TD
 
 ---
 
-## 5. Catalog of Cruft, Technical Debt & Bugs
+## 5. Catalog of Cruft, Technical Debt & Recently Fixed Bugs
 
-When working on this codebase, be aware of the following known issues:
+When working on this codebase, be aware of the following known areas and recent bugfixes:
 
-### 1. Undeclared Identifier `origText` in `uncheckAll()`
-- **File**: [src/advancement.ts](file:///l:/home/sdh/src/tlc/src/advancement.ts#L213-L220)
-- **Problem**: Lines 213 and 220 reference `origText`, but `origText` is never declared or passed as an argument. This causes a compile error in `tsc` and a runtime `ReferenceError` when clicking "Uncheck all".
-- **Intended Behavior**: In TLC's grid view, when an event is checked with a comment (e.g. `"Campout 10/4"`), leaders want the option to uncheck only entries matching that specific comment. `origText` was likely meant to be read from the UI comment box:
-  ```ts
-  const origText = ($('textarea#comment-specified').val() as string | undefined)?.trim() || '';
-  ```
-  or prompted via a dialog.
+### Recently Fixed Issues (Commit `main`)
+1. **Undeclared Identifier `origText` in `uncheckAll()` ([src/advancement.ts](file:///l:/home/sdh/src/tlc/src/advancement.ts#L213-L220))**:
+   - Fixed by deriving `origText` from `$('textarea#comment-specified').val()?.trim() || ''`.
+   - Also fixed `${label}` string interpolation to `${label.textContent}` in the confirmation dialog prompt.
+2. **Map Key Bug in [src/trailman.ts](file:///l:/home/sdh/src/tlc/src/trailman.ts#L37)**:
+   - Fixed `byName` mapping from `[t.id, t]` to `[t.name, t]`, allowing `getTrailmanByName()` to function correctly.
+3. **Double-Click & Misspelled Flag in [src/attendance.ts](file:///l:/home/sdh/src/tlc/src/attendance.ts)**:
+   - Removed premature `$(button).click()` on match, ensuring checkboxes are only clicked once in the final pass.
+   - Fixed typo `'INGORE'` -> `'IGNORE'`.
+   - Added `new Set(buttons)` deduplication and robust check state detection before toggling.
 
-### 2. Map Key Bug in `src/trailman.ts`
-- **File**: [src/trailman.ts](file:///l:/home/sdh/src/tlc/src/trailman.ts#L37)
-- **Problem**: Inside the `onUpdate` callback of `db`:
-  ```ts
-  byId = new Map(trailmen.map(t => [t.id, t]));
-  byName = new Map(trailmen.map(t => [t.id, t])); // BUG! Key is t.id, not t.name!
-  ```
-  Because `byName` maps `t.id` instead of `t.name`, `getTrailmanByName(name)` will always return `undefined`.
-- **Fix**: Change to `byName = new Map(trailmen.map(t => [t.name, t]));`.
+### Ongoing Technical Debt & Caveats
 
-### 3. Double-Click & Misspelled Flag in `src/attendance.ts`
-- **File**: [src/attendance.ts](file:///l:/home/sdh/src/tlc/src/attendance.ts#L151-L224)
-- **Problems**:
-  1. In `processCsv()`, line 151 executes `$(button).click()` on match, but then lines 217–224 iterate over all `buttons` and call `$(button).click()` a second time. This can uncheck an already checked box!
-  2. Line 198 assigns `corrections[name] = 'INGORE';` (misspelling `INGORE`), but line 145 checks `if (name === 'IGNORE') continue;`. The typo prevents ignored names from being permanently ignored.
+1. **CalDb One-Way Transform Serialization Caveat**:
+   - **File**: [src/analysis.ts](file:///l:/home/sdh/src/tlc/src/analysis.ts#L46-L56)
+   - **Problem**: `const Date = v.pipe(v.string(), v.transform(parseDate));` parses a string into a `Temporal.PlainDate`. When written back to `localStorage`, `calDb.set()` serializes the PlainDate object to JSON, but reading it back expects string input in the Valibot schema if not properly handled. Keep an eye on calendar read/write fidelity.
 
-### 4. CalDb One-Way Transform Serialization Caveat
-- **File**: [src/analysis.ts](file:///l:/home/sdh/src/tlc/src/analysis.ts#L46-L56)
-- **Problem**: `const Date = v.pipe(v.string(), v.transform(parseDate));` parses a string into a `Temporal.PlainDate`. When written back to `localStorage`, `calDb.set()` serializes the PlainDate object to JSON, but reading it back expects string input in the Valibot schema if not properly handled. Keep an eye on calendar read/write fidelity.
-
-### 5. Dead / Abandoned Code Skeletons
-- **`src/advancement.ts` line 385**:
-  ```ts
-  function updateMemoizedProgress() {
-    if (1 < 2) return; // TODO - this is a mess!
-  ```
-  This function was an early attempt to memoize grid advancement progress into `advancementsDb`. It is deactivated and contains suppressed unused warnings.
-- **`src/idb.ts`**:
-  A 32-line stub on `main`. Do not import or wire up without implementing a robust IndexedDB provider.
+2. **Dead / Abandoned Code Skeletons**:
+   - **`src/advancement.ts` line 385**:
+     ```ts
+     function updateMemoizedProgress() {
+       if (1 < 2) return; // TODO - this is a mess!
+     ```
+     This function was an early attempt to memoize grid advancement progress into `advancementsDb`. It is deactivated and contains suppressed unused warnings.
+   - **`src/idb.ts`**:
+     A 32-line stub on `main`. Do not import or wire up without implementing a robust IndexedDB provider.
 
 ---
 
@@ -298,15 +286,11 @@ When prompt engineering, refactoring, or generating code in this repository:
 
 ## 8. Recommended Roadmap for Future Enhancements
 
-If tasked with improving or cleaning up the codebase, tackle items in this priority order:
+Future enhancements should tackle items in this priority order:
 
-1. **[Immediate Fix] Fix `origText` in [src/advancement.ts](file:///l:/home/sdh/src/tlc/src/advancement.ts)**:
-   Extract `origText` from `$('textarea#comment-specified').val()` or add a prompt so that `tsc --noEmit` passes with 0 errors.
-2. **[Immediate Fix] Fix `byName` in [src/trailman.ts](file:///l:/home/sdh/src/tlc/src/trailman.ts)**:
-   Map `t.name` instead of `t.id`.
-3. **[Immediate Fix] Fix Attendance Double-Click & Typo in [src/attendance.ts](file:///l:/home/sdh/src/tlc/src/attendance.ts)**:
-   Ensure buttons are only clicked once, and fix `'INGORE'` -> `'IGNORE'`.
-4. **[Refactoring] Clean up dead advancement memoization**:
+1. **[Refactoring] Clean up dead advancement memoization**:
    Either implement proper advancement caching or delete the disabled `updateMemoizedProgress()` and unused `advancementsDb`.
-5. **[Architecture] Proper IndexedDB Migration**:
+2. **[Architecture] Proper IndexedDB Migration**:
    If migrating off `localStorage`, design an asynchronous repository pattern that doesn't break synchronous data access across UI rendering loops.
+3. **[Testing & Polyfill] Headless Testing**:
+   Decouple DOM and node environments (or use a modern jsdom/browser test runner) to add unit tests for date math (`parseDate`, `july15`) and advancement calculations (`CompletedActivities`, `BranchProgress`).

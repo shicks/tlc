@@ -34,7 +34,7 @@ const db = new Db<readonly Trailman[]>(
   {
     onUpdate(trailmen: readonly Trailman[]) {
       byId = new Map(trailmen.map(t => [t.id, t]));
-      byName = new Map(trailmen.map(t => [t.id, t]));
+      byName = new Map(trailmen.map(t => [t.name, t]));
       byPatrol = Map.groupBy(trailmen, t => t.patrol);
       byYear = Map.groupBy(trailmen, t => t.year);
       bySubpatrol = Map.groupBy(trailmen, t => t.subpatrol);

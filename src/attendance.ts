@@ -148,8 +148,6 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
       const button = buttonMap.get(id);
       if (button) {
         buttons.push(button);
-        $(button).click();
-        console.log(button);
       } else {
         lapsed.push(`${name} (${group})`);
       }
@@ -195,7 +193,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
       const name = select.dataset.name!;
       if (index === -1) continue;
       if (index === -2) {
-        corrections[name] = 'INGORE';
+        corrections[name] = 'IGNORE';
         continue;
       }
       
@@ -214,8 +212,10 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   }
   let already = 0;
   let clicked = 0;
-  for (const button of buttons) {
-    if ($(button).val()) {
+  for (const button of new Set(buttons)) {
+    const val = $(button).val();
+    const isChecked = button.checked || (val === '1' || (typeof val === 'string' && val !== '0' && val !== ''));
+    if (isChecked) {
       already++;
     } else {
       $(button).click();
