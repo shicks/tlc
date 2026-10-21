@@ -119,8 +119,9 @@ To understand the logic in this codebase, it helps to understand the terminology
     - `🔀` = HTT fulfilled by an extra HTT from another branch
     - `🌲` = Forest Award earned
 
-### 5. Calendar & Attendance Export
+### 5. Calendar, Attendance Export & Forest Awards
 - Under the **Analyze** menu:
+  - **Forest Awards**: Scrapes all branches to count earned Branch Pins (`.bp_ss`), identifies boys who completed all 7 branch pins, and injects dynamic quick-select buttons (`Fox Forest`, `Hawk Forest`, `Mountain Lion Forest`) under the `Select Trailmen:` section to select eligible candidates in one click.
   - **Edit Calendar**: Opens an interactive modal editor to configure the troop's calendar of scheduled branch events and dates.
   - **Export Attendance**: Compiles a matrix cross-referencing planned events against each trailman's completion date, with one-click transposition for spreadsheet pasting.
   - **Export Dates**: Generates a tab-separated list of all attendance dates per boy during the current program year.

@@ -173,6 +173,7 @@ graph TD
      - `analyzeProgress()`: Iterates through all 7 branches, reallocates extra HTTs, generates printable HTML report with emoji key.
      - `exportAttendance()`: TSV matrix export.
      - `editCalendar()`: Modal calendar editor for scheduled events.
+     - `computeForestAwards()`: Audits all 7 branches for completed Branch Pins and injects quick-select buttons for Forest Award candidates.
 7. **[src/emailqueue.ts](file:///l:/home/sdh/src/tlc/src/emailqueue.ts)**
    - Operates on `/email/users`.
    - Working IndexedDB database `MessageDB` with store `messages`.
