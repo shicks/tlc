@@ -140,10 +140,10 @@ function isCheckboxChecked(button: HTMLInputElement): boolean {
     if (container.classList.contains('cbx-checked') || container.classList.contains('cbx-active')) {
       return true;
     }
-    // Icon presence inside the container indicating checked state
-    if (container.querySelector('.glyphicon-ok, .fa-check, [class*="ok"], [class*="check"]')) {
-      return true;
-    }
+    // // Icon presence inside the container indicating checked state
+    // if (container.querySelector('.glyphicon-ok, .fa-check, [class*="ok"], [class*="check"]')) {
+    //   return true;
+    // }
   }
 
   // 3. For non-native-checkbox or custom widgets where value holds "1" vs "0"
@@ -214,6 +214,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
       }
       dom('option', 'SKIP', {parent: select, value: '-1'});
       dom('option', 'IGNORE', {parent: select, value: '-2'});
+      // TODO - offer a way to type with completion?
     }
     let cancelled = false;
     await new Dialog<void>({
@@ -250,6 +251,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   let clicked = 0;
   for (const [button, name] of buttons) {
     if (isCheckboxChecked(button)) {
+      //toClick.push(`<br>${name}: already clicked`);
       already++;
     } else {
       toClick.push(name);
@@ -263,7 +265,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
 
   const alreadyText = already > 0 ? `, ${already} already clicked` : '';
   const lapsedList = lapsed.length > 0 ? `, ${lapsed.length} lapsed:\n  ${lapsed.join('\n  ')}` : '';
-  Dialog.info(`Clicked ${clicked} buttons${alreadyText}${lapsedList}:\n\n${toClick.join('\n')}`);
+  Dialog.info(`Clicked ${clicked} buttons${alreadyText}${lapsedList}: ${toClick.join(' ; ')}`);
 }
 
 const URL_PREFIX = 'https://www.traillifeconnect.com/attendance';
