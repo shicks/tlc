@@ -120,6 +120,32 @@ function storeCorrections(c: Record<string, string>) {
   localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(c));
 }
 
+function isCheckboxChecked(button: HTMLInputElement): boolean {
+  // 1. Native checked property or attribute
+  if (button.checked) return true;
+  if (button.hasAttribute('checked')) return true;
+
+  // 2. Check the Krajee cbx-container wrapper classes and icons
+  const container = button.closest('.cbx-container') || button.parentElement?.closest('.cbx-container');
+  if (container) {
+    if (container.classList.contains('cbx-checked') || container.classList.contains('cbx-active')) {
+      return true;
+    }
+    // Icon presence inside the container indicating checked state
+    if (container.querySelector('.glyphicon-ok, .fa-check, [class*="ok"], [class*="check"]')) {
+      return true;
+    }
+  }
+
+  // 3. For non-native-checkbox or custom widgets where value holds "1" vs "0"
+  if (button.type !== 'checkbox') {
+    const val = $(button).val();
+    return val === '1' || val === 'true';
+  }
+
+  return false;
+}
+
 type CsvHeader = 'group' | 'lastname' | 'firstname';
 async function processCsv(data: Array<Record<CsvHeader, string>>) {
   // Map names to IDs
@@ -130,16 +156,16 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   const missed: string[] = [];
   const lapsed: string[] = [];
   const buttons: HTMLInputElement[] = [];
-  const corrections = getCorrections()
+  const corrections = getCorrections();
   for (const entry of data) {
-    // Only look at trailmen
+    // Only look at trailmen (Woodlands, Navigators, Adventurers)
     if (
       entry.group &&
-        !/Trail Life - (Foxes|Hawks|Mountain Lions)/.test(entry.group)
+        !/(Trail Life - )?(Fox(es)?|Hawk(s)?|Mountain Lion(s)?|Nav(igator(s)?)?|Adv(enturer(s)?)?)/i.test(entry.group)
     ) {
       continue;
     }
-    const group = (entry.group || 'n/a').replace('Trail Life - ', '');
+    const group = (entry.group || 'n/a').replace(/^Trail Life - /i, '').replace(/\s*\(\d+\)$/, '');
     let name = `${entry.lastname}, ${entry.firstname}`;
     if (name in corrections) name = corrections[name];
     if (name === 'IGNORE') continue;
@@ -213,9 +239,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   let already = 0;
   let clicked = 0;
   for (const button of new Set(buttons)) {
-    const val = $(button).val();
-    const isChecked = button.checked || (val === '1' || (typeof val === 'string' && val !== '0' && val !== ''));
-    if (isChecked) {
+    if (isCheckboxChecked(button)) {
       already++;
     } else {
       $(button).click();

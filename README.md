@@ -85,14 +85,35 @@ To understand the logic in this codebase, it helps to understand the terminology
   - **Clear**: Prompts for confirmation and resets the cached troop member database in `localStorage`.
 - Automatically keeps the local trailmen database fresh via a `MutationObserver`.
 
-### 2. Attendance Importer (`/attendance*`)
+### 2. Attendance Importer (`/attendance*`) & Extractor Script
 - Injected on `https://www.traillifeconnect.com/attendance*`.
-- Adds an **Import CSV** button, drag-and-drop file target, and clipboard paste listener (`Ctrl+V`).
-- Parses CSV exports (e.g. from Google Sheets or attendance check-in systems) with headers `group`, `lastname`, `firstname`.
-- Uses [fuzzball](https://www.npmjs.com/package/fuzzball) for fuzzy string matching against names found in the DOM.
-- When an exact match is missing, opens an interactive dialog presenting top fuzzy suggestions, along with options to `SKIP` or `IGNORE`.
-- Remembers manual name corrections in browser `localStorage`.
-- Automatically toggles the appropriate checkmark inputs on the page.
+- **Importing in Browser**:
+  - Adds an **Import CSV** button, drag-and-drop file target, and clipboard paste listener (`Ctrl+V`).
+  - Supports all Trail Life levels: **Woodlands Trail** (Foxes, Hawks, Mountain Lions), **Navigators**, and **Adventurers**.
+  - Parses CSV exports with headers `Group`, `Last Name`, `First Name` (or `group`, `lastname`, `firstname`).
+  - Uses [fuzzball](https://www.npmjs.com/package/fuzzball) for fuzzy string matching against roster names found in the DOM.
+  - When an exact match is missing, opens an interactive dialog presenting top fuzzy suggestions, along with options to `SKIP` or `IGNORE`.
+  - Remembers manual name corrections in browser `localStorage`.
+  - **Safe Checkbox Toggling**: Detects whether checkboxes are already checked (via native property and Krajee `.cbx-container` state) so it **only** checks unchecked members and never accidentally unchecks members checked by someone else.
+- **Extracting from Check-In Zip Files (`scripts/extract_attendance.py`)**:
+  - Script for parsing weekly check-in spreadsheets (`.xlsx` inside `.zip` files, e.g. `traillifemeetingattendanceasof*.zip`).
+  - By default, extracts attended members for the **most recent meeting date** and outputs CSV ready to copy-paste into the userscript.
+  - Usage:
+    ```bash
+    # Export most recent meeting attendance (outputs CSV to stdout)
+    npm run attendance
+    # Or directly with Python
+    python scripts/extract_attendance.py
+
+    # List all available meeting dates in the spreadsheets with attendee counts
+    npm run attendance -- --list-dates
+
+    # Export a specific date
+    npm run attendance -- --date 2026-10-19
+
+    # Export all dates to individual CSV files
+    npm run attendance -- --all
+    ```
 
 ### 3. Advancement Grid Enhancements (`/advancement*`)
 - Injected on `https://www.traillifeconnect.com/advancement*`.

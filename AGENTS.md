@@ -158,9 +158,11 @@ graph TD
    - Calculates Year 1 vs Year 2 using birthdates relative to `july15` / `oct31`.
 4. **[src/attendance.ts](file:///l:/home/sdh/src/tlc/src/attendance.ts)**
    - Operates on `/attendance`.
+   - Supports Woodlands, Navigators, and Adventurers.
    - Implements CSV parser (`papaparse`), drag-and-drop handler, and paste listener.
    - Fuzzy-matches roster names using `fuzzball` and stores manual mappings in `__sdh__attendance_corrections`.
-   - Toggles checkmarks on the attendance grid.
+   - Uses `isCheckboxChecked` to verify checked state (native property and Krajee `.cbx-container` classes/icons) before toggling, ensuring already-checked boxes are never accidentally unchecked.
+   - Accompanied by CLI extractor [scripts/extract_attendance.py](file:///l:/home/sdh/src/tlc/scripts/extract_attendance.py) (`npm run attendance`).
 5. **[src/advancement.ts](file:///l:/home/sdh/src/tlc/src/advancement.ts)**
    - Operates on `/advancement/index` (Grid View).
    - Injects quick-select buttons for patrol years (`Fox 1`, `Fox 2`, etc.).
