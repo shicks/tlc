@@ -223,10 +223,15 @@ function makeButton(
   if (typeof action !== 'function') return makeSubmenu(label, action);
   const btn = document.createElement('button');
   btn.textContent = label;
+  const ctl: ButtonController = {
+    setLabel(newLabel: string) {
+      btn.textContent = newLabel;
+    },
+  };
   btn.addEventListener('click', (e) => {
     (async () => {
       try {
-        await action();
+        await action(ctl);
       } catch (err: unknown) {
         Dialog.textarea(`FAILURE\n${(err as Error)?.stack || err}`);
       }
@@ -353,7 +358,11 @@ export function addButtonsAfter(
 interface ButtonActionMap {
   [label: string]: ButtonAction;
 }
-type ButtonAction = (() => any) | ButtonActionMap;
+type ButtonAction = ((ctl: ButtonController) => any) | ButtonActionMap;
+
+export interface ButtonController {
+  setLabel(label: string): void;
+}
 
 export function insertButtonsAtStart(
   selector: string,

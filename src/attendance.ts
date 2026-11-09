@@ -2,9 +2,12 @@
 
 import { Dialog, dom } from './ui';
 import { assertType, queryAll } from './util';
+import * as ui from './ui';
 
 import * as fuzz from 'fuzzball';
 import * as Papa from 'papaparse';
+
+let dryRun = false;
 
 export function installUi() {
   const group = document.querySelector('.btn-group');
@@ -27,6 +30,12 @@ export function installUi() {
       parent: document.body,
     },
   );
+  ui.addButtonsToTop({
+    'Mode: change': (ctl: ui.ButtonController) => {
+      dryRun = !dryRun;
+      ctl.setLabel(`Mode: ${dryRun ? 'dry run' : 'change'}`);
+    },
+  });
 
   // --- 1. Handle Click Logic ---
 
@@ -155,8 +164,9 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   const idMap = new Map(idEntries.map(([name, id]) => [name.toLowerCase().trim(), id]));
   const missed: string[] = [];
   const lapsed: string[] = [];
-  const buttons: HTMLInputElement[] = [];
+  const buttons = new Map<HTMLInputElement, string>();
   const corrections = getCorrections();
+  const toClick: string[] = [];
   for (const entry of data) {
     // Only look at trailmen (Woodlands, Navigators, Adventurers)
     if (
@@ -173,7 +183,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
     if (id) {
       const button = buttonMap.get(id);
       if (button) {
-        buttons.push(button);
+        buttons.set(button, name);
       } else {
         lapsed.push(`${name} (${group})`);
       }
@@ -229,7 +239,7 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
       if (!id) throw new Error(`Button disappeared? ${corrected}`);
       const button = buttonMap.get(id);
       if (button) {
-        buttons.push(button);
+        buttons.set(button, name);
       } else {
         lapsed.push(corrected);
       }
@@ -238,18 +248,22 @@ async function processCsv(data: Array<Record<CsvHeader, string>>) {
   }
   let already = 0;
   let clicked = 0;
-  for (const button of new Set(buttons)) {
+  for (const [button, name] of buttons) {
     if (isCheckboxChecked(button)) {
       already++;
     } else {
-      $(button).click();
+      toClick.push(name);
+      if (!dryRun) {
+        alert('whoops');
+        // $(button).click();
+      }
       clicked++;
     }
   }
 
   const alreadyText = already > 0 ? `, ${already} already clicked` : '';
   const lapsedList = lapsed.length > 0 ? `, ${lapsed.length} lapsed:\n  ${lapsed.join('\n  ')}` : '';
-  Dialog.info(`Clicked ${clicked} buttons${alreadyText}${lapsedList}`);
+  Dialog.info(`Clicked ${clicked} buttons${alreadyText}${lapsedList}:\n\n${toClick.join('\n')}`);
 }
 
 const URL_PREFIX = 'https://www.traillifeconnect.com/attendance';
